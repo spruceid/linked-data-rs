@@ -1,0 +1,10 @@
+[workspace]
+members = [
+	"serde-ld",
+	"serde-ld-derive"
+]
+
+[workspace.dependencies]
+serde-ld = { version = "0.1", path = "serde-ld" }
+serde-ld-derive = { version = "0.1", path = "serde-ld-derive" }
+iref = "3.0"
