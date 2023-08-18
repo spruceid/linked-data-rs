@@ -3,8 +3,8 @@
 <!-- cargo-rdme start -->
 
 This library provides primitive traits to serialize and deserialize
-Linked-Data types. It is shipped derive macros (using the `derive` feature)
-that can automatically implement those primitives for you.
+Linked-Data types. It is shipped with derive macros (using the `derive`
+feature) that can automatically implement those primitives for you.
 
 ## Example
 
