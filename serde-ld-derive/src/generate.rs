@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("invalid IRI `{0}`")]
     InvalidIri(String, Span),
+
+    #[error("missing variant IRI")]
+    MissingVariantIri(Span)
 }
 
 impl Error {
@@ -28,6 +31,7 @@ impl Error {
             Self::InvalidAttribute(_, span) => *span,
             Self::UnknownFieldSerializationMethod(span) => *span,
             Self::InvalidIri(_, span) => *span,
+            Self::MissingVariantIri(span) => *span
         }
     }
 }
@@ -82,6 +86,10 @@ pub struct FieldAttributes {
     iri: Option<CompactIri>,
     flatten: bool,
     is_id: bool,
+}
+
+pub struct VariantAttributes {
+    iri: Option<CompactIri>
 }
 
 fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttributes, Error> {
@@ -260,5 +268,61 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
         iri,
         flatten,
         is_id,
+    })
+}
+
+fn read_variant_attributes(attributes: Vec<syn::Attribute>) -> Result<VariantAttributes, Error> {
+    let mut iri = None;
+
+    for attr in attributes {
+        if attr.path().is_ident("ld") {
+            let span = attr.span();
+            match attr.meta {
+                syn::Meta::List(list) => {
+                    let mut tokens = list.tokens.into_iter();
+                    match tokens.next() {
+                        Some(TokenTree::Literal(l)) => {
+                            let l = syn::Lit::new(l);
+                            match l {
+                                syn::Lit::Str(l) => match IriBuf::new(l.value()) {
+                                    Ok(value) => {
+                                        iri = Some(CompactIri(value, l.span()));
+                                    }
+                                    Err(_) => {
+                                        return Err(Error::InvalidAttribute(
+                                            AttributeError::InvalidCompactIri,
+                                            l.span(),
+                                        ))
+                                    }
+                                },
+                                l => {
+                                    return Err(Error::InvalidAttribute(
+                                        AttributeError::ExpectedString,
+                                        l.span(),
+                                    ))
+                                }
+                            }
+                        }
+                        Some(token) => {
+                            return Err(Error::InvalidAttribute(
+                                AttributeError::UnexpectedToken,
+                                token.span(),
+                            ))
+                        }
+                        None => return Err(Error::InvalidAttribute(AttributeError::Empty, span)),
+                    }
+                }
+                _ => {
+                    return Err(Error::InvalidAttribute(
+                        AttributeError::InvalidShape,
+                        attr.span(),
+                    ))
+                }
+            }
+        }
+    }
+
+    Ok(VariantAttributes {
+        iri
     })
 }

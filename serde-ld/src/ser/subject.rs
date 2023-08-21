@@ -9,6 +9,15 @@ pub trait SerializeSubject<V: Vocabulary, I> {
         S: SubjectSerializer<V, I>;
 }
 
+impl<'a, V: Vocabulary, I, T: SerializeSubject<V, I>> SerializeSubject<V, I> for &'a T {
+    fn serialize_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: SubjectSerializer<V, I>
+    {
+        T::serialize_subject(self, serializer)
+    }
+}
+
 pub trait SubjectSerializer<V: Vocabulary, I> {
     type Ok;
     type Error;
