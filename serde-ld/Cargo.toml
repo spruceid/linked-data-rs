@@ -3,16 +3,15 @@ name = "serde-ld"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["derive"]
 derive = ["serde-ld-derive"]
 
 [dependencies]
 iref.workspace = true
-rdf-types = { path = "/home/work/Documents/Community/rdf/rdf-types" }
+rdf-types = { git = "https://github.com/timothee-haudebourg/rdf-types.git" }
 serde-ld-derive = { workspace = true, optional = true }
+thiserror.workspace = true
 
 [[example]]
 name = "derive"

@@ -1,11 +1,10 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{
-    BlankId, BlankIdBuf, BlankIdVocabularyMut, Generator, Id, Interpretation, IriVocabularyMut,
-    Term, Vocabulary,
+    BlankId, BlankIdBuf, BlankIdVocabularyMut, Generator, Id, IriVocabularyMut, Term, Vocabulary,
 };
 
 /// Type that can have a lexical representation.
-pub trait LexicalRepresentation<V: Vocabulary, I: Interpretation> {
+pub trait LexicalRepresentation<V: Vocabulary, I> {
     fn lexical_representation(
         &self,
         interpretation: &mut I,
@@ -30,7 +29,7 @@ impl Anonymous {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LexicalRepresentation<V, I> for Anonymous {
+impl<V: Vocabulary, I> LexicalRepresentation<V, I> for Anonymous {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
@@ -41,7 +40,7 @@ impl<V: Vocabulary, I: Interpretation> LexicalRepresentation<V, I> for Anonymous
     }
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LexicalRepresentation<V, I> for Iri {
+impl<V: Vocabulary + IriVocabularyMut, I> LexicalRepresentation<V, I> for Iri {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
@@ -52,7 +51,7 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LexicalRepresentation<
     }
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LexicalRepresentation<V, I> for IriBuf {
+impl<V: Vocabulary + IriVocabularyMut, I> LexicalRepresentation<V, I> for IriBuf {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
@@ -63,9 +62,7 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LexicalRepresentation<
     }
 }
 
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LexicalRepresentation<V, I>
-    for BlankId
-{
+impl<V: Vocabulary + BlankIdVocabularyMut, I> LexicalRepresentation<V, I> for BlankId {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
@@ -76,9 +73,7 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LexicalRepresentat
     }
 }
 
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LexicalRepresentation<V, I>
-    for BlankIdBuf
-{
+impl<V: Vocabulary + BlankIdVocabularyMut, I> LexicalRepresentation<V, I> for BlankIdBuf {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
@@ -89,8 +84,8 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LexicalRepresentat
     }
 }
 
-impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
-    LexicalRepresentation<V, I> for Id<&'a Iri, &'a BlankId>
+impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I> LexicalRepresentation<V, I>
+    for Id<&'a Iri, &'a BlankId>
 {
     fn lexical_representation(
         &self,
@@ -105,8 +100,8 @@ impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretat
     }
 }
 
-impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
-    LexicalRepresentation<V, I> for Id<IriBuf, BlankIdBuf>
+impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I> LexicalRepresentation<V, I>
+    for Id<IriBuf, BlankIdBuf>
 {
     fn lexical_representation(
         &self,
@@ -121,9 +116,7 @@ impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
     }
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LexicalRepresentation<V, I>> LexicalRepresentation<V, I>
-    for Option<T>
-{
+impl<V: Vocabulary, I, T: LexicalRepresentation<V, I>> LexicalRepresentation<V, I> for Option<T> {
     fn lexical_representation(
         &self,
         interpretation: &mut I,

@@ -11,5 +11,5 @@ syn = "2.0.29"
 proc-macro2 = "1.0.66"
 quote = "1.0.33"
 proc-macro-error = "1.0.4"
-thiserror = "1.0.47"
+thiserror.workspace = true
 iref.workspace = true

@@ -31,6 +31,8 @@ pub use iref;
 pub use rdf_types;
 
 mod datatypes;
+mod quads;
 mod ser;
 
+pub use quads::{to_quads, to_quads_with, QuadSerializer};
 pub use ser::*;

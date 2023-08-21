@@ -37,11 +37,11 @@ pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
 
                 let serialize_field = if field_attrs.flatten {
                     bounds.push(quote!(
-                        #ty: ::serde_ld::SerializeSubjectProperties<V, I>
+                        #ty: ::serde_ld::SerializeSubject<V, I>
                     ));
 
                     quote! {
-                        <#ty as ::serde_ld::SerializeSubjectProperties<V, I>>::serialize_subject_properties(&self.#field_id, &mut serializer)?;
+                        <#ty as ::serde_ld::SerializeSubject<V, I>>::serialize_subject(&self.#field_id, &mut serializer)?;
                     }
                 } else {
                     match field_attrs.iri {
@@ -81,40 +81,82 @@ pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
                     });
 
                     quote! {
-                        self.#field_id
+                        self.#field_id.lexical_representation(interpretation, vocabulary, generator)
                     }
                 }
                 None => quote! {
-                    ::serde_ld::Anonymous
+                    ::serde_ld::Anonymous.lexical_representation(vocabulary, generator)
                 },
             };
 
             Ok(quote! {
+                impl<V, I> ::serde_ld::LexicalRepresentation<V, I> for #ident
+                where
+                    V: #base_vocabulary_bound,
+                    #(#bounds),*
+                {
+                    fn lexical_representation(
+                        &self,
+                        interpretation: &mut I,
+                        vocabulary: &mut V,
+                        generator: &mut impl ::serde_ld::rdf_types::Generator<V>,
+                    ) -> ::serde_ld::rdf_types::Term<::serde_ld::rdf_types::Id<V::Iri, V::BlankId>, V::Literal> {
+                        #term
+                    }
+                }
+
                 impl<V, I> ::serde_ld::SerializeSubject<V, I> for #ident
                 where
                     V: #base_vocabulary_bound,
-                    I: ::serde_ld::rdf_types::Interpretation,
                     #(#bounds),*
                 {
                     fn serialize_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
                     where
                         S: ::serde_ld::SubjectSerializer<V, I>
                     {
-                        serializer.begin(&#term, self)
+                        #(#serialize_fields)*
+                        serializer.end()
                     }
                 }
 
-                impl<V, I> ::serde_ld::SerializeSubjectProperties<V, I> for #ident
+                impl<V, I> ::serde_ld::SerializePredicate<V, I> for #ident
                 where
                     V: #base_vocabulary_bound,
-                    I: ::serde_ld::rdf_types::Interpretation,
                     #(#bounds),*
                 {
-                    fn serialize_subject_properties<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+                    fn serialize_predicate<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
                     where
-                        S: ::serde_ld::SubjectPropertiesSerializer<V, I>
+                        S: ::serde_ld::PredicateSerializer<V, I>
                     {
-                        #(#serialize_fields)*
+                        serializer.insert(self)?;
+                        serializer.end()
+                    }
+                }
+
+                impl<V, I> ::serde_ld::SerializeGraph<V, I> for #ident
+                where
+                    V: #base_vocabulary_bound,
+                    #(#bounds),*
+                {
+                    fn serialize_graph<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: ::serde_ld::GraphSerializer<V, I>
+                    {
+                        serializer.insert(self)?;
+                        serializer.end()
+                    }
+                }
+
+                impl<V, I> ::serde_ld::SerializeLd<V, I> for #ident
+                where
+                    V: #base_vocabulary_bound,
+                    #(#bounds),*
+                {
+                    fn serialize<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: ::serde_ld::Serializer<V, I>
+                    {
+                        serializer.insert_default(self)?;
                         serializer.end()
                     }
                 }

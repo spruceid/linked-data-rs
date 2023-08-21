@@ -65,9 +65,9 @@ pub struct CompactIri(IriBuf, Span);
 
 impl CompactIri {
     pub fn expand(&self, prefixes: &HashMap<String, String>) -> Result<IriBuf, Error> {
-        let prefix = self.0.scheme().as_str();
+        let (prefix, suffix) = self.0.split_once(':').unwrap();
         match prefixes.get(prefix) {
-            Some(suffix) => IriBuf::new(format!("{prefix}{suffix}"))
+            Some(expanded_prefix) => IriBuf::new(format!("{expanded_prefix}{suffix}"))
                 .map_err(|InvalidIri(s)| Error::InvalidIri(s, self.1)),
             None => Ok(self.0.clone()),
         }
