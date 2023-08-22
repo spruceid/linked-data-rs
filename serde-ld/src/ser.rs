@@ -20,7 +20,7 @@ pub trait SerializeLd<V: Vocabulary = (), I = ()> {
 impl<'a, V: Vocabulary, I, T: SerializeLd<V, I>> SerializeLd<V, I> for &'a T {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer<V, I>
+        S: Serializer<V, I>,
     {
         T::serialize(self, serializer)
     }

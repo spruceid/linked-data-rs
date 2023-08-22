@@ -12,7 +12,7 @@ pub trait SerializeSubject<V: Vocabulary, I> {
 impl<'a, V: Vocabulary, I, T: SerializeSubject<V, I>> SerializeSubject<V, I> for &'a T {
     fn serialize_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: SubjectSerializer<V, I>
+        S: SubjectSerializer<V, I>,
     {
         T::serialize_subject(self, serializer)
     }
