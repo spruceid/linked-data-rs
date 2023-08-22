@@ -45,8 +45,8 @@ pub fn generate(
 			variant.fields
 		);
 
-		let nest = variant_nest(&attrs, &variant_attrs)?;
-		let shape = variant_shape(&attrs, &ident, &variant)?;
+		let nest = variant_nest(attrs, &variant_attrs)?;
+		let shape = variant_shape(attrs, &ident, &variant)?;
 		
 		if nest.is_some() {
 			if !nested {
@@ -56,11 +56,9 @@ pub fn generate(
 
 				nested = true;
 			}
-		} else {
-			if nested {
-				return Err(Error::MissingVariantIri(span))
-			}
-		}
+		} else if nested {
+  				return Err(Error::MissingVariantIri(span))
+  			}
 
 		let variant_id = &variant.ident;
 		let input = &variant.input;

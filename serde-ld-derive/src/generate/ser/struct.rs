@@ -16,7 +16,7 @@ pub fn generate(
 		|f| quote!(self.#f), 
 		|i| {
 			let index = syn::Index {
-				index: i as u32,
+				index: i,
 				span: Span::call_site(),
 			};
 			

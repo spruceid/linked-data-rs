@@ -1,12 +1,12 @@
-use iref::IriBuf;
-use proc_macro2::{Span, TokenStream, Ident};
-use quote::{quote, format_ident, ToTokens};
+
+use proc_macro2::{TokenStream, Ident};
+use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DeriveInput};
 
 mod r#struct;
 mod r#enum;
 
-use super::{read_field_attributes, read_type_attributes, Error, TypeAttributes, read_variant_attributes, VariantAttributes};
+use super::{read_field_attributes, read_type_attributes, Error, TypeAttributes};
 
 pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
     let attrs = read_type_attributes(input.attrs)?;
