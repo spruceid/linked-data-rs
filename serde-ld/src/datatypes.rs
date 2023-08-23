@@ -17,16 +17,15 @@ macro_rules! datatype {
                 fn lexical_representation(
                     &self,
                     _interpretation: &mut I,
-                    vocabulary: &mut V,
-                    _generator: &mut impl rdf_types::Generator<V>,
-                ) -> Term<rdf_types::Id<<V>::Iri, <V>::BlankId>, <V>::Literal> {
+                    vocabulary: &mut V
+                ) -> Option<Term<rdf_types::Id<<V>::Iri, <V>::BlankId>, <V>::Literal>> {
                     let ty = vocabulary.insert(Iri::new($iri).unwrap());
                     let literal = vocabulary
                         .insert_owned_literal(Literal::new(
                             self.to_string().into(),
                             Type::Any(ty).into(),
                         ));
-                    Term::Literal(literal)
+                    Some(Term::Literal(literal))
                 }
             }
 

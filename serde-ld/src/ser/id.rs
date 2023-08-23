@@ -1,7 +1,9 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{
-    BlankId, BlankIdBuf, BlankIdVocabularyMut, Generator, Id, IriVocabularyMut, Term, Vocabulary,
+    BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, IriVocabularyMut, Term, Vocabulary,
 };
+
+use crate::RdfTerm;
 
 /// Type that can have a lexical representation.
 pub trait LexicalRepresentation<V: Vocabulary, I> {
@@ -9,8 +11,7 @@ pub trait LexicalRepresentation<V: Vocabulary, I> {
         &self,
         interpretation: &mut I,
         vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal>;
+    ) -> Option<RdfTerm<V>>;
 }
 
 /// Anonymous lexical representation.
@@ -19,24 +20,13 @@ pub trait LexicalRepresentation<V: Vocabulary, I> {
 /// node identifier.
 pub struct Anonymous;
 
-impl Anonymous {
-    pub fn lexical_representation<V: Vocabulary>(
-        &self,
-        vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        Term::Id(generator.next(vocabulary))
-    }
-}
-
 impl<V: Vocabulary, I> LexicalRepresentation<V, I> for Anonymous {
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
-        vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        self.lexical_representation(vocabulary, generator)
+        _vocabulary: &mut V,
+    ) -> Option<RdfTerm<V>> {
+        None
     }
 }
 
@@ -45,9 +35,8 @@ impl<V: Vocabulary + IriVocabularyMut, I> LexicalRepresentation<V, I> for Iri {
         &self,
         _interpretation: &mut I,
         vocabulary: &mut V,
-        _generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        Term::Id(Id::Iri(vocabulary.insert(self)))
+    ) -> Option<RdfTerm<V>> {
+        Some(Term::Id(Id::Iri(vocabulary.insert(self))))
     }
 }
 
@@ -56,9 +45,8 @@ impl<V: Vocabulary + IriVocabularyMut, I> LexicalRepresentation<V, I> for IriBuf
         &self,
         _interpretation: &mut I,
         vocabulary: &mut V,
-        _generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        Term::Id(Id::Iri(vocabulary.insert(self)))
+    ) -> Option<RdfTerm<V>> {
+        Some(Term::Id(Id::Iri(vocabulary.insert(self))))
     }
 }
 
@@ -67,9 +55,8 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I> LexicalRepresentation<V, I> for Bl
         &self,
         _interpretation: &mut I,
         vocabulary: &mut V,
-        _generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        Term::Id(Id::Blank(vocabulary.insert_blank_id(self)))
+    ) -> Option<RdfTerm<V>> {
+        Some(Term::Id(Id::Blank(vocabulary.insert_blank_id(self))))
     }
 }
 
@@ -78,9 +65,8 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I> LexicalRepresentation<V, I> for Bl
         &self,
         _interpretation: &mut I,
         vocabulary: &mut V,
-        _generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        Term::Id(Id::Blank(vocabulary.insert_blank_id(self)))
+    ) -> Option<RdfTerm<V>> {
+        Some(Term::Id(Id::Blank(vocabulary.insert_blank_id(self))))
     }
 }
 
@@ -91,11 +77,10 @@ impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I> LexicalRepr
         &self,
         interpretation: &mut I,
         vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
+    ) -> Option<RdfTerm<V>> {
         match self {
-            Self::Iri(i) => i.lexical_representation(interpretation, vocabulary, generator),
-            Self::Blank(b) => b.lexical_representation(interpretation, vocabulary, generator),
+            Self::Iri(i) => i.lexical_representation(interpretation, vocabulary),
+            Self::Blank(b) => b.lexical_representation(interpretation, vocabulary),
         }
     }
 }
@@ -107,11 +92,10 @@ impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I> LexicalRepresen
         &self,
         interpretation: &mut I,
         vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
+    ) -> Option<RdfTerm<V>> {
         match self {
-            Self::Iri(i) => i.lexical_representation(interpretation, vocabulary, generator),
-            Self::Blank(b) => b.lexical_representation(interpretation, vocabulary, generator),
+            Self::Iri(i) => i.lexical_representation(interpretation, vocabulary),
+            Self::Blank(b) => b.lexical_representation(interpretation, vocabulary),
         }
     }
 }
@@ -121,11 +105,8 @@ impl<V: Vocabulary, I, T: LexicalRepresentation<V, I>> LexicalRepresentation<V, 
         &self,
         interpretation: &mut I,
         vocabulary: &mut V,
-        generator: &mut impl Generator<V>,
-    ) -> Term<Id<V::Iri, V::BlankId>, V::Literal> {
-        match self {
-            Some(t) => t.lexical_representation(interpretation, vocabulary, generator),
-            None => Anonymous.lexical_representation(vocabulary, generator),
-        }
+    ) -> Option<RdfTerm<V>> {
+        self.as_ref()
+            .and_then(|t| t.lexical_representation(interpretation, vocabulary))
     }
 }

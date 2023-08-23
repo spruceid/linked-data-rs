@@ -1,29 +1,24 @@
-
-use proc_macro2::{TokenStream, Ident};
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DeriveInput};
 
-mod r#struct;
 mod r#enum;
+mod r#struct;
 
 use super::{read_field_attributes, read_type_attributes, Error, TypeAttributes};
 
 pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
     let attrs = read_type_attributes(input.attrs)?;
     match input.data {
-        syn::Data::Struct(s) => {
-            r#struct::generate(&attrs, input.ident, s)
-        }
-        syn::Data::Enum(e) => {
-            r#enum::generate(&attrs, input.ident, e)
-        }
+        syn::Data::Struct(s) => r#struct::generate(&attrs, input.ident, s),
+        syn::Data::Enum(e) => r#enum::generate(&attrs, input.ident, e),
         syn::Data::Union(u) => Err(Error::UnionType(u.union_token.span())),
     }
 }
 
 #[derive(Default, Clone, Copy)]
 pub struct VocabularyBounds {
-    iri_mut: bool
+    iri_mut: bool,
 }
 
 impl VocabularyBounds {
@@ -50,13 +45,13 @@ impl ToTokens for VocabularyBounds {
 pub struct FieldsSerialization {
     bounds: Vec<TokenStream>,
     vocabulary_bounds: VocabularyBounds,
-    body: TokenStream
+    body: TokenStream,
 }
 
 #[derive(Default)]
 pub struct CompoundFields {
     serialize: FieldsSerialization,
-    id_field: Option<(TokenStream, syn::Type)>
+    id_field: Option<(TokenStream, syn::Type)>,
 }
 
 fn variant_compound_fields(
@@ -64,7 +59,7 @@ fn variant_compound_fields(
     fields: syn::Fields,
     named_accessor: impl Fn(Ident) -> TokenStream,
     unnamed_accessor: impl Fn(u32) -> TokenStream,
-    by_ref: impl Fn(TokenStream) -> TokenStream
+    by_ref: impl Fn(TokenStream) -> TokenStream,
 ) -> Result<CompoundFields, Error> {
     let mut id_field = None;
     let mut serialize = FieldsSerialization::default();
@@ -74,12 +69,12 @@ fn variant_compound_fields(
     for (i, field) in fields.into_iter().enumerate() {
         let span = field.span();
         let field_attrs = read_field_attributes(field.attrs)?;
-        
+
         let field_access = match field.ident {
             Some(id) => named_accessor(id),
-            None => unnamed_accessor(i as u32)
+            None => unnamed_accessor(i as u32),
         };
-        
+
         let ty = field.ty;
 
         if field_attrs.is_id {
@@ -126,6 +121,6 @@ fn variant_compound_fields(
 
     Ok(CompoundFields {
         id_field,
-        serialize
+        serialize,
     })
 }

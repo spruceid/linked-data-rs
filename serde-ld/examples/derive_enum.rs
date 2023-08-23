@@ -29,10 +29,7 @@ enum PropertyCompound {
 
 fn main() {
     let a = Subject::Name("A".to_string());
-    println!(
-        "{}",
-        a.lexical_representation(&mut (), &mut (), &mut generator::Blank::new())
-    );
+    println!("{}", a.lexical_representation(&mut (), &mut ()).unwrap());
 
     println!();
     let b = SubjectCompound::Name("B".to_string());

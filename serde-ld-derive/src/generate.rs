@@ -21,7 +21,7 @@ pub enum Error {
     InvalidIri(String, Span),
 
     #[error("missing variant IRI")]
-    MissingVariantIri(Span)
+    MissingVariantIri(Span),
 }
 
 impl Error {
@@ -31,7 +31,7 @@ impl Error {
             Self::InvalidAttribute(_, span) => *span,
             Self::UnknownFieldSerializationMethod(span) => *span,
             Self::InvalidIri(_, span) => *span,
-            Self::MissingVariantIri(span) => *span
+            Self::MissingVariantIri(span) => *span,
         }
     }
 }
@@ -89,7 +89,7 @@ pub struct FieldAttributes {
 }
 
 pub struct VariantAttributes {
-    iri: Option<CompactIri>
+    iri: Option<CompactIri>,
 }
 
 fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttributes, Error> {
@@ -322,7 +322,5 @@ fn read_variant_attributes(attributes: Vec<syn::Attribute>) -> Result<VariantAtt
         }
     }
 
-    Ok(VariantAttributes {
-        iri
-    })
+    Ok(VariantAttributes { iri })
 }

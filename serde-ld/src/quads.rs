@@ -1,15 +1,9 @@
-use rdf_types::{
-    BlankIdVocabulary, Generator, Id, IriVocabulary, LiteralVocabulary, Quad, Term, Vocabulary,
-};
+use rdf_types::{Generator, Id, Quad, Term, Vocabulary};
 
 use crate::{
-    GraphSerializer, LexicalRepresentation, PredicateSerializer, SerializeGraph, SerializeLd,
-    Serializer, SubjectSerializer,
+    GraphSerializer, LexicalRepresentation, PredicateSerializer, RdfId, RdfQuad, RdfTerm,
+    SerializeGraph, SerializeLd, Serializer, SubjectSerializer,
 };
-
-pub type RdfId<V> = Id<<V as IriVocabulary>::Iri, <V as BlankIdVocabulary>::BlankId>;
-pub type RdfTerm<V> = Term<RdfId<V>, <V as LiteralVocabulary>::Literal>;
-pub type RdfQuad<V> = Quad<RdfId<V>, <V as IriVocabulary>::Iri, RdfTerm<V>, RdfId<V>>;
 
 pub fn to_quads_with<V: Vocabulary, I>(
     vocabulary: &mut V,
@@ -92,7 +86,8 @@ where
         T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeGraph<V, I>,
     {
         let graph = value
-            .lexical_representation(self.interpretation, self.vocabulary, &mut self.generator)
+            .lexical_representation(self.interpretation, self.vocabulary)
+            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)))
             .into_id()
             .ok_or(Error::Graph)?;
         let graph_serializer = QuadGraphSerializer {
@@ -133,8 +128,9 @@ where
     where
         T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
     {
-        let term =
-            value.lexical_representation(self.interpretation, self.vocabulary, self.generator);
+        let term = value
+            .lexical_representation(self.interpretation, self.vocabulary)
+            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)));
         let properties_serializer = QuadPropertiesSerializer {
             vocabulary: self.vocabulary,
             interpretation: self.interpretation,
@@ -178,11 +174,11 @@ where
     {
         match self.subject {
             Term::Id(subject) => {
-                match predicate.lexical_representation(
-                    self.interpretation,
-                    self.vocabulary,
-                    self.generator,
-                ) {
+                let term = predicate
+                    .lexical_representation(self.interpretation, self.vocabulary)
+                    .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)));
+
+                match term {
                     Term::Id(Id::Iri(iri)) => {
                         let objects_serializer = ObjectsSerializer {
                             vocabulary: self.vocabulary,
@@ -208,7 +204,8 @@ where
         T: ?Sized + LexicalRepresentation<V, I> + SerializeGraph<V, I>,
     {
         let graph = value
-            .lexical_representation(self.interpretation, self.vocabulary, &mut self.generator)
+            .lexical_representation(self.interpretation, self.vocabulary)
+            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)))
             .into_id()
             .ok_or(Error::Graph)?;
 
@@ -252,8 +249,9 @@ where
     where
         T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
     {
-        let term =
-            value.lexical_representation(self.interpretation, self.vocabulary, self.generator);
+        let term = value
+            .lexical_representation(self.interpretation, self.vocabulary)
+            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)));
         let subject_serializer = QuadPropertiesSerializer {
             vocabulary: self.vocabulary,
             interpretation: self.interpretation,

@@ -22,7 +22,10 @@
 //! }
 //! ```
 use iref::Iri;
-use rdf_types::{IriVocabularyMut, Vocabulary};
+use rdf_types::{
+    BlankIdVocabulary, Id, IriVocabulary, IriVocabularyMut, LiteralVocabulary, Quad, Term,
+    Vocabulary,
+};
 #[cfg(feature = "derive")]
 pub use serde_ld_derive::SerializeLd;
 
@@ -39,6 +42,10 @@ mod ser;
 pub use quads::{to_quads, to_quads_with, QuadSerializer};
 pub use ser::*;
 
+pub type RdfId<V> = Id<<V as IriVocabulary>::Iri, <V as BlankIdVocabulary>::BlankId>;
+pub type RdfTerm<V> = Term<RdfId<V>, <V as LiteralVocabulary>::Literal>;
+pub type RdfQuad<V> = Quad<RdfId<V>, <V as IriVocabulary>::Iri, RdfTerm<V>, RdfId<V>>;
+
 pub struct AnonymousBinding<'a, T>(pub &'a Iri, pub &'a T);
 
 impl<'a, T> AnonymousBinding<'a, T> {
@@ -51,10 +58,9 @@ impl<'a, V: Vocabulary, I, T> LexicalRepresentation<V, I> for AnonymousBinding<'
     fn lexical_representation(
         &self,
         _interpretation: &mut I,
-        vocabulary: &mut V,
-        generator: &mut impl rdf_types::Generator<V>,
-    ) -> rdf_types::Term<rdf_types::Id<<V>::Iri, <V>::BlankId>, <V>::Literal> {
-        Anonymous.lexical_representation(vocabulary, generator)
+        _vocabulary: &mut V,
+    ) -> Option<rdf_types::Term<rdf_types::Id<<V>::Iri, <V>::BlankId>, <V>::Literal>> {
+        None
     }
 }
 
