@@ -148,7 +148,7 @@ pub fn generate(
                 &self,
                 interpretation: &mut I,
                 vocabulary: &mut V
-            ) -> Option<::serde_ld::rdf_types::Term<::serde_ld::rdf_types::Id<V::Iri, V::BlankId>, V::Literal>> {
+            ) -> Option<::serde_ld::RdfTerm<V>> {
                 match self {
                     #(#lexical_repr_cases)*
                 }
@@ -704,7 +704,7 @@ fn variant_subject_type(
                 &self,
                 interpretation: &mut I,
                 vocabulary: &mut V
-            ) -> Option<::serde_ld::rdf_types::Term<::serde_ld::rdf_types::Id<V::Iri, V::BlankId>, V::Literal>> {
+            ) -> Option<::serde_ld::RdfTerm<V>> {
                 let #subject_id #input = self;
                 #term
             }

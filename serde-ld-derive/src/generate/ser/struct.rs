@@ -54,7 +54,7 @@ pub fn generate(
                 &self,
                 interpretation: &mut I,
                 vocabulary: &mut V
-            ) -> Option<::serde_ld::rdf_types::Term<::serde_ld::rdf_types::Id<V::Iri, V::BlankId>, V::Literal>> {
+            ) -> Option<::serde_ld::RdfTerm<V>> {
                 #term
             }
         }

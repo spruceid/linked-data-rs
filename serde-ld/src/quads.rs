@@ -1,8 +1,11 @@
-use rdf_types::{Generator, Id, Quad, Term, Vocabulary};
+use rdf_types::{
+    Generator, Id, InsertIntoVocabulary, IriVocabularyMut, LiteralVocabularyMut, Quad, Term,
+    Vocabulary,
+};
 
 use crate::{
-    GraphSerializer, LexicalRepresentation, PredicateSerializer, RdfId, RdfQuad, RdfTerm,
-    SerializeGraph, SerializeLd, Serializer, SubjectSerializer,
+    GraphSerializer, LexicalRepresentation, PredicateSerializer, RdfId, RdfQuad, SerializeGraph,
+    SerializeLd, Serializer, SubjectSerializer,
 };
 
 pub fn to_quads_with<V: Vocabulary, I>(
@@ -12,9 +15,12 @@ pub fn to_quads_with<V: Vocabulary, I>(
     value: &impl SerializeLd<V, I>,
 ) -> Result<Vec<RdfQuad<V>>, Error>
 where
+    V: IriVocabularyMut + LiteralVocabularyMut,
     V::BlankId: Clone,
     V::Iri: Clone,
     V::Literal: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
 {
     value.serialize(QuadSerializer {
         vocabulary,
@@ -34,6 +40,24 @@ pub fn to_quads(
         generator,
         result: Vec::new(),
     })
+}
+
+fn generate_term<V: Vocabulary, I>(
+    vocabulary: &mut V,
+    interpretation: &mut I,
+    generator: &mut impl Generator<V>,
+    value: &(impl ?Sized + LexicalRepresentation<V, I>),
+) -> Term<RdfId<V>, V::Literal>
+where
+    V: IriVocabularyMut + LiteralVocabularyMut,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+{
+    match value.lexical_representation(interpretation, vocabulary) {
+        Some(Term::Id(id)) => Term::Id(id),
+        Some(Term::Literal(l)) => Term::Literal(l.insert_into_vocabulary(vocabulary)),
+        None => Term::Id(generator.next(vocabulary)),
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -58,9 +82,12 @@ pub struct QuadSerializer<'a, V: Vocabulary, I, G> {
 
 impl<'a, V: Vocabulary, I, G> Serializer<V, I> for QuadSerializer<'a, V, I, G>
 where
+    V: IriVocabularyMut + LiteralVocabularyMut,
     V::BlankId: Clone,
     V::Iri: Clone,
     V::Literal: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
     G: Generator<V>,
 {
     type Ok = Vec<RdfQuad<V>>;
@@ -116,9 +143,12 @@ pub struct QuadGraphSerializer<'a, V: Vocabulary, I, G> {
 
 impl<'a, V: Vocabulary, I, G> GraphSerializer<V, I> for QuadGraphSerializer<'a, V, I, G>
 where
+    V: IriVocabularyMut + LiteralVocabularyMut,
     V::BlankId: Clone,
     V::Iri: Clone,
     V::Literal: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
     G: Generator<V>,
 {
     type Ok = ();
@@ -128,9 +158,7 @@ where
     where
         T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
     {
-        let term = value
-            .lexical_representation(self.interpretation, self.vocabulary)
-            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)));
+        let term = generate_term(self.vocabulary, self.interpretation, self.generator, value);
         let properties_serializer = QuadPropertiesSerializer {
             vocabulary: self.vocabulary,
             interpretation: self.interpretation,
@@ -154,14 +182,17 @@ pub struct QuadPropertiesSerializer<'a, V: Vocabulary, I, G> {
     generator: &'a mut G,
     result: &'a mut Vec<RdfQuad<V>>,
     graph: Option<&'a RdfId<V>>,
-    subject: &'a RdfTerm<V>,
+    subject: &'a Term<RdfId<V>, V::Literal>,
 }
 
 impl<'a, V: Vocabulary, I, G> SubjectSerializer<V, I> for QuadPropertiesSerializer<'a, V, I, G>
 where
+    V: IriVocabularyMut + LiteralVocabularyMut,
     V::BlankId: Clone,
     V::Iri: Clone,
     V::Literal: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
     G: Generator<V>,
 {
     type Ok = ();
@@ -237,9 +268,12 @@ pub struct ObjectsSerializer<'a, V: Vocabulary, I, G> {
 
 impl<'a, V: Vocabulary, I, G> PredicateSerializer<V, I> for ObjectsSerializer<'a, V, I, G>
 where
+    V: IriVocabularyMut + LiteralVocabularyMut,
     V::BlankId: Clone,
     V::Iri: Clone,
     V::Literal: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
     G: Generator<V>,
 {
     type Ok = ();
@@ -249,9 +283,7 @@ where
     where
         T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
     {
-        let term = value
-            .lexical_representation(self.interpretation, self.vocabulary)
-            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)));
+        let term = generate_term(self.vocabulary, self.interpretation, self.generator, value);
         let subject_serializer = QuadPropertiesSerializer {
             vocabulary: self.vocabulary,
             interpretation: self.interpretation,
