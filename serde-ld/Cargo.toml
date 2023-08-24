@@ -10,7 +10,7 @@ derive = ["serde-ld-derive"]
 [dependencies]
 rdf-types = "0.16"
 # xsd-types = "0.7.6"
-xsd-types = { path = "/home/work/Documents/Community/rdf/xsd-types" }
+xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 static-iref = "3.0"
 json-syntax = "0.9.5"
 iref.workspace = true
