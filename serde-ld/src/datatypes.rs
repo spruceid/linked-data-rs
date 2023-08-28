@@ -1,11 +1,11 @@
 use iref::Iri;
 use rdf_types::{
-    literal::Type, Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary,
+	literal::Type, Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary,
 };
 
 use crate::{
-    LexicalRepresentation, PredicateSerializer, RdfLiteral, RdfTerm, SerializePredicate,
-    SerializeSubject,
+	LexicalRepresentation, PredicateSerializer, RdfLiteral, RdfTerm, SerializePredicate,
+	SerializeSubject,
 };
 
 macro_rules! datatype {
@@ -60,13 +60,13 @@ macro_rules! datatype {
 }
 
 datatype! {
-    u8: "http://www.w3.org/2001/XMLSchema#unsignedByte",
-    u16: "http://www.w3.org/2001/XMLSchema#unsignedShort",
-    u32: "http://www.w3.org/2001/XMLSchema#unsignedInt",
-    u64: "http://www.w3.org/2001/XMLSchema#unsignedLong",
-    i8: "http://www.w3.org/2001/XMLSchema#byte",
-    i16: "http://www.w3.org/2001/XMLSchema#short",
-    i32: "http://www.w3.org/2001/XMLSchema#int",
-    i64: "http://www.w3.org/2001/XMLSchema#long",
-    String: "http://www.w3.org/2001/XMLSchema#string"
+	u8: "http://www.w3.org/2001/XMLSchema#unsignedByte",
+	u16: "http://www.w3.org/2001/XMLSchema#unsignedShort",
+	u32: "http://www.w3.org/2001/XMLSchema#unsignedInt",
+	u64: "http://www.w3.org/2001/XMLSchema#unsignedLong",
+	i8: "http://www.w3.org/2001/XMLSchema#byte",
+	i16: "http://www.w3.org/2001/XMLSchema#short",
+	i32: "http://www.w3.org/2001/XMLSchema#int",
+	i64: "http://www.w3.org/2001/XMLSchema#long",
+	String: "http://www.w3.org/2001/XMLSchema#string"
 }
