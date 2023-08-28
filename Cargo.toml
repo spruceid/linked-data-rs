@@ -4,6 +4,8 @@ members = [
 	"serde-ld-derive"
 ]
 
+resolver = "2"
+
 [workspace.dependencies]
 serde-ld = { version = "0.1", path = "serde-ld" }
 serde-ld-derive = { version = "0.1", path = "serde-ld-derive" }
