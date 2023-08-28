@@ -232,20 +232,19 @@ where
 
     fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + LexicalRepresentation<V, I> + SerializeGraph<V, I>,
+        T: ?Sized + SerializeGraph<V, I>,
     {
-        let graph = value
-            .lexical_representation(self.interpretation, self.vocabulary)
-            .unwrap_or_else(|| Term::Id(self.generator.next(self.vocabulary)))
-            .into_id()
-            .ok_or(Error::Graph)?;
+        let graph = match self.subject {
+            Term::Id(id) => id,
+            Term::Literal(_) => return Err(Error::Graph),
+        };
 
         let graph_serializer = QuadGraphSerializer {
             vocabulary: self.vocabulary,
             interpretation: self.interpretation,
             generator: &mut self.generator,
             result: self.result,
-            graph: Some(&graph),
+            graph: Some(graph),
         };
 
         value.serialize_graph(graph_serializer)

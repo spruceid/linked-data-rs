@@ -29,7 +29,7 @@ pub trait SubjectSerializer<V: Vocabulary, I> {
 
     fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + LexicalRepresentation<V, I> + SerializeGraph<V, I>;
+        T: ?Sized + SerializeGraph<V, I>;
 
     fn end(self) -> Result<Self::Ok, Self::Error>;
 }
@@ -48,7 +48,7 @@ impl<'s, V: Vocabulary, I, S: SubjectSerializer<V, I>> SubjectSerializer<V, I> f
 
     fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ?Sized + LexicalRepresentation<V, I> + SerializeGraph<V, I>,
+        T: ?Sized + SerializeGraph<V, I>,
     {
         S::graph(self, value)
     }
