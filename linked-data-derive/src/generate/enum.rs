@@ -15,23 +15,23 @@ pub fn generate(
 	let mut lexical_repr_bounds = Vec::new();
 	let mut lexical_repr_cases = Vec::new();
 
-	let mut serialize_subject_bounds = Vec::new();
-	let mut serialize_subject_vocabulary_bounds = VocabularyBounds::default();
-	let mut serialize_subject_cases = Vec::new();
+	let mut visit_subject_bounds = Vec::new();
+	let mut visit_subject_vocabulary_bounds = VocabularyBounds::default();
+	let mut visit_subject_cases = Vec::new();
 
-	let mut serialize_predicate_bounds = Vec::new();
-	let mut serialize_predicate_vocabulary_bounds = VocabularyBounds::default();
-	let mut serialize_predicate_cases = Vec::new();
+	let mut visit_predicate_bounds = Vec::new();
+	let mut visit_predicate_vocabulary_bounds = VocabularyBounds::default();
+	let mut visit_predicate_cases = Vec::new();
 
-	let mut serialize_graph_bounds = Vec::new();
-	let mut serialize_graph_vocabulary_bounds = VocabularyBounds::default();
-	let mut serialize_graph_cases = Vec::new();
+	let mut visit_graph_bounds = Vec::new();
+	let mut visit_graph_vocabulary_bounds = VocabularyBounds::default();
+	let mut visit_graph_cases = Vec::new();
 
-	let mut serialize_ld_bounds = Vec::new();
-	let mut serialize_ld_vocabulary_bounds = VocabularyBounds::default();
-	let mut serialize_ld_cases = Vec::new();
+	let mut visit_ld_bounds = Vec::new();
+	let mut visit_ld_vocabulary_bounds = VocabularyBounds::default();
+	let mut visit_ld_cases = Vec::new();
 
-	// let mut serialize_predicate;
+	// let mut visit_objects;
 
 	let mut nested = false;
 	let mut last_variant_span = None;
@@ -73,59 +73,59 @@ pub fn generate(
 			}
 		});
 
-		let serialize_subject_case = variant_serialize_subject(
+		let visit_subject_case = variant_visit_subject(
 			&variant,
 			nest.as_deref(),
 			&shape,
-			&mut serialize_subject_bounds,
-			&mut serialize_subject_vocabulary_bounds,
+			&mut visit_subject_bounds,
+			&mut visit_subject_vocabulary_bounds,
 		);
 
-		serialize_subject_cases.push(quote! {
+		visit_subject_cases.push(quote! {
 			Self::#variant_id #input => {
-				#serialize_subject_case
+				#visit_subject_case
 			}
 		});
 
-		let serialize_predicate_case = variant_serialize_predicate(
+		let visit_predicate_case = variant_visit_predicate(
 			&variant,
 			nest.as_deref(),
 			&shape,
-			&mut serialize_predicate_bounds,
-			&mut serialize_predicate_vocabulary_bounds,
+			&mut visit_predicate_bounds,
+			&mut visit_predicate_vocabulary_bounds,
 		);
 
-		serialize_predicate_cases.push(quote! {
+		visit_predicate_cases.push(quote! {
 			Self::#variant_id #input => {
-				#serialize_predicate_case
+				#visit_predicate_case
 			}
 		});
 
-		let serialize_graph_case = variant_serialize_graph(
+		let visit_graph_case = variant_visit_graph(
 			&variant,
 			nest.as_deref(),
 			&shape,
-			&mut serialize_graph_bounds,
-			&mut serialize_graph_vocabulary_bounds,
+			&mut visit_graph_bounds,
+			&mut visit_graph_vocabulary_bounds,
 		);
 
-		serialize_graph_cases.push(quote! {
+		visit_graph_cases.push(quote! {
 			Self::#variant_id #input => {
-				#serialize_graph_case
+				#visit_graph_case
 			}
 		});
 
-		let serialize_ld_case = variant_serialize(
+		let visit_ld_case = variant_serialize(
 			&variant,
 			nest.as_deref(),
 			&shape,
-			&mut serialize_ld_bounds,
-			&mut serialize_ld_vocabulary_bounds,
+			&mut visit_ld_bounds,
+			&mut visit_ld_vocabulary_bounds,
 		);
 
-		serialize_ld_cases.push(quote! {
+		visit_ld_cases.push(quote! {
 			Self::#variant_id #input => {
-				#serialize_ld_case
+				#visit_ld_case
 			}
 		});
 
@@ -139,78 +139,78 @@ pub fn generate(
 	Ok(quote! {
 		#(#compound_types)*
 
-		impl<V, I> ::serde_ld::LexicalRepresentation<V, I> for #ident
+		impl<V, I> ::linked_data::LexicalRepresentation<V, I> for #ident
 		where
-			V: ::serde_ld::rdf_types::Vocabulary,
+			V: ::linked_data::rdf_types::Vocabulary,
 			#(#lexical_repr_bounds),*
 		{
 			fn lexical_representation(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::serde_ld::RdfTerm<V>> {
+			) -> Option<::linked_data::RdfTerm<V>> {
 				match self {
 					#(#lexical_repr_cases)*
 				}
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeSubject<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataSubject<V, I> for #ident
 		where
-			V: #serialize_subject_vocabulary_bounds,
-			#(#serialize_subject_bounds),*
+			V: #visit_subject_vocabulary_bounds,
+			#(#visit_subject_bounds),*
 		{
-			fn serialize_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::SubjectSerializer<V, I>
+				S: ::linked_data::SubjectVisitor<V, I>
 			{
 				match self {
-					#(#serialize_subject_cases)*
+					#(#visit_subject_cases)*
 				}
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializePredicate<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #ident
 		where
-			V: #serialize_predicate_vocabulary_bounds,
-			#(#serialize_predicate_bounds),*
+			V: #visit_predicate_vocabulary_bounds,
+			#(#visit_predicate_bounds),*
 		{
-			fn serialize_predicate<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::PredicateSerializer<V, I>
+				S: ::linked_data::PredicateObjectsVisitor<V, I>
 			{
 				match self {
-					#(#serialize_predicate_cases)*
+					#(#visit_predicate_cases)*
 				}
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeGraph<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataGraph<V, I> for #ident
 		where
-			V: #serialize_graph_vocabulary_bounds,
-			#(#serialize_graph_bounds),*
+			V: #visit_graph_vocabulary_bounds,
+			#(#visit_graph_bounds),*
 		{
-			fn serialize_graph<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::GraphSerializer<V, I>
+				S: ::linked_data::GraphVisitor<V, I>
 			{
 				match self {
-					#(#serialize_graph_cases)*
+					#(#visit_graph_cases)*
 				}
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeLd<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedData<V, I> for #ident
 		where
-			V: #serialize_ld_vocabulary_bounds,
-			#(#serialize_ld_bounds),*
+			V: #visit_ld_vocabulary_bounds,
+			#(#visit_ld_bounds),*
 		{
-			fn serialize<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::Serializer<V, I>
+				S: ::linked_data::Visitor<V, I>
 			{
 				match self {
-					#(#serialize_ld_cases)*
+					#(#visit_ld_cases)*
 				}
 			}
 		}
@@ -277,11 +277,11 @@ fn variant_lexical_representation(
 		match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::serde_ld::LexicalRepresentation<V, I>
+					#ty: ::linked_data::LexicalRepresentation<V, I>
 				});
 
 				quote! {
-					<#ty as ::serde_ld::LexicalRepresentation<V, I>>::lexical_representation(
+					<#ty as ::linked_data::LexicalRepresentation<V, I>>::lexical_representation(
 						#id,
 						interpretation,
 						vocabulary
@@ -305,7 +305,7 @@ fn variant_lexical_representation(
 	}
 }
 
-fn variant_serialize_subject(
+fn variant_visit_subject(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
@@ -320,36 +320,36 @@ fn variant_serialize_subject(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::serde_ld::SerializePredicate<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
 					});
 
 					quote! {
-						serializer.insert(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						visitor.predicate(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
 						)?;
-						serializer.end()
+						visitor.end()
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
 					let inner_id = &inner_ty.ident;
 					let input = &variant.input;
 
-					bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-					vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+					bounds.extend(inner_ty.visit_bounds.iter().cloned());
+					vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 					quote! {
-						serializer.insert(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						visitor.predicate(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
 						)?;
 
-						serializer.end()
+						visitor.end()
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						serializer.end()
+						visitor.end()
 					}
 				}
 			}
@@ -357,34 +357,34 @@ fn variant_serialize_subject(
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::serde_ld::SerializeSubject<V, I>
+					#ty: ::linked_data::LinkedDataSubject<V, I>
 				});
 
 				quote! {
-					<#ty as ::serde_ld::SerializeSubject<V, I>>::serialize_subject(#id, serializer)
+					<#ty as ::linked_data::LinkedDataSubject<V, I>>::visit_subject(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
 				let inner_id = &inner_ty.ident;
 				let input = &variant.input;
 
-				bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-				vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+				bounds.extend(inner_ty.visit_bounds.iter().cloned());
+				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .serialize_subject(serializer)
+					#inner_id #input .visit_subject(visitor)
 				}
 			}
 			VariantShape::Unit => {
 				quote! {
-					serializer.end()
+					visitor.end()
 				}
 			}
 		},
 	}
 }
 
-fn variant_serialize_predicate(
+fn variant_visit_predicate(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
@@ -399,34 +399,34 @@ fn variant_serialize_predicate(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::serde_ld::SerializePredicate<V, I> + ::serde_ld::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
 					});
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).serialize_predicate(serializer)
+						).visit_objects(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
 					let inner_id = &inner_ty.ident;
 					let input = &variant.input;
 
-					bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-					vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+					bounds.extend(inner_ty.visit_bounds.iter().cloned());
+					vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).serialize_predicate(serializer)
+						).visit_objects(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						serializer.insert(::serde_ld::iref::Iri::new(#iri).unwrap())?;
-						serializer.end()
+						visitor.object(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.end()
 					}
 				}
 			}
@@ -434,34 +434,34 @@ fn variant_serialize_predicate(
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::serde_ld::SerializePredicate<V, I>
+					#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
 				});
 
 				quote! {
-					<#ty as ::serde_ld::SerializePredicate<V, I>>::serialize_predicate(#id, serializer)
+					<#ty as ::linked_data::LinkedDataPredicateObjects<V, I>>::visit_objects(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
 				let inner_id = &inner_ty.ident;
 				let input = &variant.input;
 
-				bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-				vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+				bounds.extend(inner_ty.visit_bounds.iter().cloned());
+				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .serialize_predicate(serializer)
+					#inner_id #input .visit_objects(visitor)
 				}
 			}
 			VariantShape::Unit => {
 				quote! {
-					serializer.end()
+					visitor.end()
 				}
 			}
 		},
 	}
 }
 
-fn variant_serialize_graph(
+fn variant_visit_graph(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
@@ -476,34 +476,34 @@ fn variant_serialize_graph(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::serde_ld::SerializePredicate<V, I> + ::serde_ld::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
 					});
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).serialize_graph(serializer)
+						).visit_graph(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
 					let inner_id = &inner_ty.ident;
 					let input = &variant.input;
 
-					bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-					vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+					bounds.extend(inner_ty.visit_bounds.iter().cloned());
+					vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).serialize_graph(serializer)
+						).visit_graph(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						serializer.insert(::serde_ld::iref::Iri::new(#iri).unwrap())?;
-						serializer.end()
+						visitor.subject(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.end()
 					}
 				}
 			}
@@ -511,27 +511,27 @@ fn variant_serialize_graph(
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::serde_ld::SerializeGraph<V, I>
+					#ty: ::linked_data::LinkedDataGraph<V, I>
 				});
 
 				quote! {
-					<#ty as ::serde_ld::SerializeGraph<V, I>>::serialize_graph(#id, serializer)
+					<#ty as ::linked_data::LinkedDataGraph<V, I>>::visit_graph(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
 				let inner_id = &inner_ty.ident;
 				let input = &variant.input;
 
-				bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-				vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+				bounds.extend(inner_ty.visit_bounds.iter().cloned());
+				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .serialize_graph(serializer)
+					#inner_id #input .visit_graph(visitor)
 				}
 			}
 			VariantShape::Unit => {
 				quote! {
-					serializer.end()
+					visitor.end()
 				}
 			}
 		},
@@ -553,34 +553,34 @@ fn variant_serialize(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::serde_ld::SerializePredicate<V, I> + ::serde_ld::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
 					});
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).serialize(serializer)
+						).visit(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
 					let inner_id = &inner_ty.ident;
 					let input = &variant.input;
 
-					bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-					vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+					bounds.extend(inner_ty.visit_bounds.iter().cloned());
+					vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 					quote! {
-						::serde_ld::AnonymousBinding(
-							::serde_ld::iref::Iri::new(#iri).unwrap(),
+						::linked_data::AnonymousBinding(
+							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).serialize(serializer)
+						).visit(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						serializer.insert_default(::serde_ld::iref::Iri::new(#iri).unwrap())?;
-						serializer.end()
+						visitor.default_graph(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.end()
 					}
 				}
 			}
@@ -588,27 +588,27 @@ fn variant_serialize(
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::serde_ld::SerializeLd<V, I>
+					#ty: ::linked_data::LinkedData<V, I>
 				});
 
 				quote! {
-					<#ty as ::serde_ld::SerializeLd<V, I>>::serialize(#id, serializer)
+					<#ty as ::linked_data::LinkedData<V, I>>::visit(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
 				let inner_id = &inner_ty.ident;
 				let input = &variant.input;
 
-				bounds.extend(inner_ty.serialize_bounds.iter().cloned());
-				vocabulary_bounds.add(inner_ty.serialize_vocabulary_bounds);
+				bounds.extend(inner_ty.visit_bounds.iter().cloned());
+				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .serialize(serializer)
+					#inner_id #input .visit(visitor)
 				}
 			}
 			VariantShape::Unit => {
 				quote! {
-					serializer.end()
+					visitor.end()
 				}
 			}
 		},
@@ -618,8 +618,8 @@ fn variant_serialize(
 struct VariantSubjectType {
 	ident: Ident,
 	// lexical_repr_bounds: Vec<TokenStream>,
-	serialize_bounds: Vec<TokenStream>,
-	serialize_vocabulary_bounds: VocabularyBounds,
+	visit_bounds: Vec<TokenStream>,
+	visit_vocabulary_bounds: VocabularyBounds,
 	definition: TokenStream,
 }
 
@@ -665,18 +665,18 @@ fn variant_subject_type(
 	};
 
 	let mut lexical_repr_bounds = Vec::new();
-	let serialize_bounds = compound_fields.serialize.bounds;
-	let serialize_vocabulary_bounds = compound_fields.serialize.vocabulary_bounds;
-	let serialize_body = &compound_fields.serialize.body;
+	let visit_bounds = compound_fields.visit.bounds;
+	let visit_vocabulary_bounds = compound_fields.visit.vocabulary_bounds;
+	let visit_body = &compound_fields.visit.body;
 
 	let term = match compound_fields.id_field {
 		Some((field_access, ty)) => {
 			// bounds.push(quote! {
-			// 	#ty: ::serde_ld::LexicalRepresentation<V, I>
+			// 	#ty: ::linked_data::LexicalRepresentation<V, I>
 			// });
 
 			lexical_repr_bounds.push(quote! {
-				#ty: ::serde_ld::LexicalRepresentation<V, I>
+				#ty: ::linked_data::LexicalRepresentation<V, I>
 			});
 
 			quote! {
@@ -695,74 +695,74 @@ fn variant_subject_type(
 		#[allow(non_camel_case_types)]
 		struct #subject_id<'_nest> #borrowed_fields;
 
-		impl<'_nest, V, I> ::serde_ld::LexicalRepresentation<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::LexicalRepresentation<V, I> for #subject_id<'_nest>
 		where
-			V: ::serde_ld::rdf_types::Vocabulary,
+			V: ::linked_data::rdf_types::Vocabulary,
 			#(#lexical_repr_bounds),*
 		{
 			fn lexical_representation(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::serde_ld::RdfTerm<V>> {
+			) -> Option<::linked_data::RdfTerm<V>> {
 				let #subject_id #input = self;
 				#term
 			}
 		}
 
-		impl<'_nest, V, I> ::serde_ld::SerializeSubject<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::LinkedDataSubject<V, I> for #subject_id<'_nest>
 		where
-			V: #serialize_vocabulary_bounds,
-			#(#serialize_bounds),*
+			V: #visit_vocabulary_bounds,
+			#(#visit_bounds),*
 		{
-			fn serialize_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::SubjectSerializer<V, I>
+				S: ::linked_data::SubjectVisitor<V, I>
 			{
 				let #subject_id #input = self;
-				#serialize_body
+				#visit_body
 			}
 		}
 
-		impl<'_nest, V, I> ::serde_ld::SerializePredicate<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #subject_id<'_nest>
 		where
-			V: #serialize_vocabulary_bounds,
-			#(#serialize_bounds),*
+			V: #visit_vocabulary_bounds,
+			#(#visit_bounds),*
 		{
-			fn serialize_predicate<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::PredicateSerializer<V, I>
+				S: ::linked_data::PredicateObjectsVisitor<V, I>
 			{
-				serializer.insert(self)?;
-				serializer.end()
+				visitor.object(self)?;
+				visitor.end()
 			}
 		}
 
-		impl<'_nest, V, I> ::serde_ld::SerializeGraph<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::LinkedDataGraph<V, I> for #subject_id<'_nest>
 		where
-			V: #serialize_vocabulary_bounds,
-			#(#serialize_bounds),*
+			V: #visit_vocabulary_bounds,
+			#(#visit_bounds),*
 		{
-			fn serialize_graph<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::GraphSerializer<V, I>
+				S: ::linked_data::GraphVisitor<V, I>
 			{
-				serializer.insert(self)?;
-				serializer.end()
+				visitor.subject(self)?;
+				visitor.end()
 			}
 		}
 
-		impl<'_nest, V, I> ::serde_ld::SerializeLd<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::LinkedData<V, I> for #subject_id<'_nest>
 		where
-			V: #serialize_vocabulary_bounds,
-			#(#serialize_bounds),*
+			V: #visit_vocabulary_bounds,
+			#(#visit_bounds),*
 		{
-			fn serialize<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::Serializer<V, I>
+				S: ::linked_data::Visitor<V, I>
 			{
-				serializer.insert_default(self)?;
-				serializer.end()
+				visitor.default_graph(self)?;
+				visitor.end()
 			}
 		}
 	};
@@ -770,8 +770,8 @@ fn variant_subject_type(
 	Ok(VariantSubjectType {
 		ident: subject_id,
 		// lexical_repr_bounds,
-		serialize_bounds,
-		serialize_vocabulary_bounds,
+		visit_bounds,
+		visit_vocabulary_bounds,
 		definition,
 	})
 }

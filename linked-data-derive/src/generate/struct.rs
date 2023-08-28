@@ -25,14 +25,14 @@ pub fn generate(
 		|t| quote!(&#t),
 	)?;
 
-	let mut bounds = fields.serialize.bounds;
-	let serialize = fields.serialize.body;
-	let vocabulary_bounds = fields.serialize.vocabulary_bounds;
+	let mut bounds = fields.visit.bounds;
+	let visit = fields.visit.body;
+	let vocabulary_bounds = fields.visit.vocabulary_bounds;
 
 	let term = match fields.id_field {
 		Some((field_access, ty)) => {
 			bounds.push(quote! {
-				#ty: ::serde_ld::LexicalRepresentation<V, I>
+				#ty: ::linked_data::LexicalRepresentation<V, I>
 			});
 
 			quote! {
@@ -45,7 +45,7 @@ pub fn generate(
 	};
 
 	Ok(quote! {
-		impl<V, I> ::serde_ld::LexicalRepresentation<V, I> for #ident
+		impl<V, I> ::linked_data::LexicalRepresentation<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
 			#(#bounds),*
@@ -54,63 +54,63 @@ pub fn generate(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::serde_ld::RdfTerm<V>> {
+			) -> Option<::linked_data::RdfTerm<V>> {
 				#term
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeSubject<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataSubject<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
 			#(#bounds),*
 		{
-			fn serialize_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::SubjectSerializer<V, I>
+				S: ::linked_data::SubjectVisitor<V, I>
 			{
-				#serialize
+				#visit
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializePredicate<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
 			#(#bounds),*
 		{
-			fn serialize_predicate<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::PredicateSerializer<V, I>
+				S: ::linked_data::PredicateObjectsVisitor<V, I>
 			{
-				serializer.insert(self)?;
-				serializer.end()
+				visitor.object(self)?;
+				visitor.end()
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeGraph<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedDataGraph<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
 			#(#bounds),*
 		{
-			fn serialize_graph<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::GraphSerializer<V, I>
+				S: ::linked_data::GraphVisitor<V, I>
 			{
-				serializer.insert(self)?;
-				serializer.end()
+				visitor.subject(self)?;
+				visitor.end()
 			}
 		}
 
-		impl<V, I> ::serde_ld::SerializeLd<V, I> for #ident
+		impl<V, I> ::linked_data::LinkedData<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
 			#(#bounds),*
 		{
-			fn serialize<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: ::serde_ld::Serializer<V, I>
+				S: ::linked_data::Visitor<V, I>
 			{
-				serializer.insert_default(self)?;
-				serializer.end()
+				visitor.default_graph(self)?;
+				visitor.end()
 			}
 		}
 	})

@@ -1,13 +1,13 @@
 [workspace]
 members = [
-	"serde-ld",
-	"serde-ld-derive"
+	"linked-data",
+	"linked-data-derive"
 ]
 
 resolver = "2"
 
 [workspace.dependencies]
-serde-ld = { version = "0.1", path = "serde-ld" }
-serde-ld-derive = { version = "0.1", path = "serde-ld-derive" }
+linked-data = { version = "0.1", path = "linked-data" }
+linked-data-derive = { version = "0.1", path = "linked-data-derive" }
 iref = "3.0"
 thiserror = "1.0.47"

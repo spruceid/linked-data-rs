@@ -1,11 +1,11 @@
 [package]
-name = "serde-ld"
+name = "linked-data"
 version = "0.1.0"
 edition = "2021"
 
 [features]
 default = ["derive"]
-derive = ["serde-ld-derive"]
+derive = ["linked-data-derive"]
 
 [dependencies]
 rdf-types = "0.16"
@@ -14,7 +14,7 @@ xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 static-iref = "3.0"
 json-syntax = "0.9.5"
 iref.workspace = true
-serde-ld-derive = { workspace = true, optional = true }
+linked-data-derive = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [[example]]

@@ -4,15 +4,15 @@ use rdf_types::{
 };
 
 use crate::{
-	GraphSerializer, LexicalRepresentation, PredicateSerializer, RdfId, RdfQuad, SerializeGraph,
-	SerializeLd, Serializer, SubjectSerializer,
+	GraphVisitor, LexicalRepresentation, LinkedData, LinkedDataGraph, PredicateObjectsVisitor,
+	RdfId, RdfQuad, SubjectVisitor, Visitor,
 };
 
 pub fn to_quads_with<V: Vocabulary, I>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	generator: impl Generator<V>,
-	value: &impl SerializeLd<V, I>,
+	value: &impl LinkedData<V, I>,
 ) -> Result<Vec<RdfQuad<V>>, Error>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
@@ -22,7 +22,7 @@ where
 	V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
 	V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
 {
-	value.serialize(QuadSerializer {
+	value.visit(QuadSerializer {
 		vocabulary,
 		interpretation,
 		generator,
@@ -32,9 +32,9 @@ where
 
 pub fn to_quads(
 	generator: impl Generator<()>,
-	value: &impl SerializeLd,
+	value: &impl LinkedData,
 ) -> Result<Vec<Quad>, Error> {
-	value.serialize(QuadSerializer {
+	value.visit(QuadSerializer {
 		vocabulary: &mut (),
 		interpretation: &mut (),
 		generator,
@@ -80,7 +80,7 @@ pub struct QuadSerializer<'a, V: Vocabulary, I, G> {
 	result: Vec<RdfQuad<V>>,
 }
 
-impl<'a, V: Vocabulary, I, G> Serializer<V, I> for QuadSerializer<'a, V, I, G>
+impl<'a, V: Vocabulary, I, G> Visitor<V, I> for QuadSerializer<'a, V, I, G>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
@@ -93,9 +93,9 @@ where
 	type Ok = Vec<RdfQuad<V>>;
 	type Error = Error;
 
-	fn insert_default<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + crate::SerializeGraph<V, I>,
+		T: ?Sized + crate::LinkedDataGraph<V, I>,
 	{
 		let graph_serializer = QuadGraphSerializer {
 			vocabulary: self.vocabulary,
@@ -105,12 +105,12 @@ where
 			graph: None,
 		};
 
-		value.serialize_graph(graph_serializer)
+		value.visit_graph(graph_serializer)
 	}
 
-	fn insert<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeGraph<V, I>,
+		T: ?Sized + LexicalRepresentation<V, I> + crate::LinkedDataGraph<V, I>,
 	{
 		let graph = value
 			.lexical_representation(self.interpretation, self.vocabulary)
@@ -125,7 +125,7 @@ where
 			graph: Some(&graph),
 		};
 
-		value.serialize_graph(graph_serializer)
+		value.visit_graph(graph_serializer)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -141,7 +141,7 @@ pub struct QuadGraphSerializer<'a, V: Vocabulary, I, G> {
 	graph: Option<&'a RdfId<V>>,
 }
 
-impl<'a, V: Vocabulary, I, G> GraphSerializer<V, I> for QuadGraphSerializer<'a, V, I, G>
+impl<'a, V: Vocabulary, I, G> GraphVisitor<V, I> for QuadGraphSerializer<'a, V, I, G>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
@@ -154,9 +154,9 @@ where
 	type Ok = ();
 	type Error = Error;
 
-	fn insert<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
+		T: ?Sized + LexicalRepresentation<V, I> + crate::LinkedDataSubject<V, I>,
 	{
 		let term = generate_term(self.vocabulary, self.interpretation, self.generator, value);
 		let properties_serializer = QuadPropertiesSerializer {
@@ -168,7 +168,7 @@ where
 			subject: &term,
 		};
 
-		value.serialize_subject(properties_serializer)
+		value.visit_subject(properties_serializer)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -185,7 +185,7 @@ pub struct QuadPropertiesSerializer<'a, V: Vocabulary, I, G> {
 	subject: &'a Term<RdfId<V>, V::Literal>,
 }
 
-impl<'a, V: Vocabulary, I, G> SubjectSerializer<V, I> for QuadPropertiesSerializer<'a, V, I, G>
+impl<'a, V: Vocabulary, I, G> SubjectVisitor<V, I> for QuadPropertiesSerializer<'a, V, I, G>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
@@ -198,10 +198,10 @@ where
 	type Ok = ();
 	type Error = Error;
 
-	fn insert<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
+	fn predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
 	where
 		L: ?Sized + LexicalRepresentation<V, I>,
-		T: ?Sized + crate::SerializePredicate<V, I>,
+		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
 	{
 		match self.subject {
 			Term::Id(subject) => {
@@ -221,7 +221,7 @@ where
 							predicate: iri,
 						};
 
-						value.serialize_predicate(objects_serializer)
+						value.visit_objects(objects_serializer)
 					}
 					_ => Err(Error::Predicate),
 				}
@@ -232,7 +232,7 @@ where
 
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + SerializeGraph<V, I>,
+		T: ?Sized + LinkedDataGraph<V, I>,
 	{
 		let graph = match self.subject {
 			Term::Id(id) => id,
@@ -247,7 +247,7 @@ where
 			graph: Some(graph),
 		};
 
-		value.serialize_graph(graph_serializer)
+		value.visit_graph(graph_serializer)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -265,7 +265,7 @@ pub struct ObjectsSerializer<'a, V: Vocabulary, I, G> {
 	predicate: V::Iri,
 }
 
-impl<'a, V: Vocabulary, I, G> PredicateSerializer<V, I> for ObjectsSerializer<'a, V, I, G>
+impl<'a, V: Vocabulary, I, G> PredicateObjectsVisitor<V, I> for ObjectsSerializer<'a, V, I, G>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
@@ -278,9 +278,9 @@ where
 	type Ok = ();
 	type Error = Error;
 
-	fn insert<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LexicalRepresentation<V, I> + crate::SerializeSubject<V, I>,
+		T: ?Sized + LexicalRepresentation<V, I> + crate::LinkedDataSubject<V, I>,
 	{
 		let term = generate_term(self.vocabulary, self.interpretation, self.generator, value);
 		let subject_serializer = QuadPropertiesSerializer {
@@ -292,7 +292,7 @@ where
 			subject: &term,
 		};
 
-		value.serialize_subject(subject_serializer)?;
+		value.visit_subject(subject_serializer)?;
 		self.result.push(Quad(
 			self.subject.clone(),
 			self.predicate.clone(),

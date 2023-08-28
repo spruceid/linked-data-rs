@@ -4,8 +4,8 @@ use rdf_types::{
 };
 
 use crate::{
-	LexicalRepresentation, PredicateSerializer, RdfLiteral, RdfTerm, SerializePredicate,
-	SerializeSubject,
+	LexicalRepresentation, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
+	RdfLiteral, RdfTerm,
 };
 
 macro_rules! datatype {
@@ -29,30 +29,30 @@ macro_rules! datatype {
                 }
             }
 
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> SerializeSubject<V, I> for $ty
+            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
             where
                 V::Value: From<String>,
                 V::Type: From<Type<V::Iri, V::LanguageTag>>,
             {
-                fn serialize_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
                 where
-                    S: crate::SubjectSerializer<V, I>
+                    S: crate::SubjectVisitor<V, I>
                 {
-                    serializer.end()
+                    visitor.end()
                 }
             }
 
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> SerializePredicate<V, I> for $ty
+            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
             where
                 V::Value: From<String>,
                 V::Type: From<Type<V::Iri, V::LanguageTag>>,
             {
-                fn serialize_predicate<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+                fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
                 where
-                    S: PredicateSerializer<V, I>,
+                    S: PredicateObjectsVisitor<V, I>,
                 {
-                    serializer.insert(self)?;
-                    serializer.end()
+                    visitor.object(self)?;
+                    visitor.end()
                 }
             }
         )*

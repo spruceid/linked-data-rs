@@ -10,9 +10,9 @@ feature) that can automatically implement those primitives for you.
 
 ```rust
 use iref::IriBuf;
-use serde_ld::SerializeLd;
+use linked_data::LinkedData;
 
-#[derive(SerializeLd)]
+#[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
 struct Foo {
   #[ld(id)]

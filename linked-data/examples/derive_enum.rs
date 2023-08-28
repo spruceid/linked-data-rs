@@ -1,26 +1,26 @@
+use linked_data::{to_quads, LexicalRepresentation, LinkedData};
 use rdf_types::{generator, RdfDisplay};
-use serde_ld::{to_quads, LexicalRepresentation, SerializeLd};
 
-#[derive(SerializeLd)]
+#[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum Subject {
 	Name(String),
 }
 
-#[derive(SerializeLd)]
+#[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum SubjectCompound {
 	Name(#[ld("ex:name")] String),
 }
 
-#[derive(SerializeLd)]
+#[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum Property {
 	#[ld("ex:name")]
 	Name(String),
 }
 
-#[derive(SerializeLd)]
+#[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum PropertyCompound {
 	#[ld("ex:name")]
