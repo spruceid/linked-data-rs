@@ -447,7 +447,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
 	where
 		T: ?Sized + Interpret<V, I> + crate::LinkedDataGraph<V, I>,
 	{
-		let i = value.interpret(self.interpretation, self.vocabulary);
+		let i = value.interpret(self.vocabulary, self.interpretation);
 		let graph = self.domain.graph(self.vocabulary, self.interpretation, i)?;
 
 		let graph_serializer = QuadGraphSerializer {
@@ -484,7 +484,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> GraphVisitor<V, I>
 	where
 		T: ?Sized + Interpret<V, I> + crate::LinkedDataSubject<V, I>,
 	{
-		let i = value.interpret(self.interpretation, self.vocabulary);
+		let i = value.interpret(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.subject(self.vocabulary, self.interpretation, i)?;
@@ -544,7 +544,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 	{
 		let subject = self.subject.into_subject(self.domain)?;
 
-		let i = predicate.interpret(self.interpretation, self.vocabulary);
+		let i = predicate.interpret(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.predicate(self.vocabulary, self.interpretation, i)?;
@@ -604,7 +604,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 	where
 		T: ?Sized + Interpret<V, I> + crate::LinkedDataSubject<V, I>,
 	{
-		let i = value.interpret(self.interpretation, self.vocabulary);
+		let i = value.interpret(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.object(self.vocabulary, self.interpretation, i)?;

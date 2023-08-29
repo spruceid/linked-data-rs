@@ -36,7 +36,7 @@ pub fn generate(
 			});
 
 			quote! {
-				#field_access.interpret(interpretation, vocabulary)
+				#field_access.interpret(vocabulary, interpretation)
 			}
 		}
 		None => quote! {
@@ -53,8 +53,8 @@ pub fn generate(
 		{
 			fn interpret(
 				&self,
-				interpretation: &mut I,
-				vocabulary: &mut V
+				vocabulary: &mut V,
+				interpretation: &mut I
 			) -> linked_data::ResourceInterpretation<V, I> {
 				#term
 			}

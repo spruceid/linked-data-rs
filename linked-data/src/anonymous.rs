@@ -17,8 +17,8 @@ impl<'a, T> AnonymousBinding<'a, T> {
 impl<'a, V: Vocabulary, I: Interpretation, T> Interpret<V, I> for AnonymousBinding<'a, T> {
 	fn interpret(
 		&self,
-		_interpretation: &mut I,
 		_vocabulary: &mut V,
+		_interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
 		ResourceInterpretation::Uninterpreted(None)
 	}

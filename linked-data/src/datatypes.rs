@@ -18,8 +18,8 @@ macro_rules! datatype {
             {
                 fn interpret(
                     &self,
+                    vocabulary: &mut V,
                     _interpretation: &mut I,
-                    vocabulary: &mut V
                 ) -> ResourceInterpretation<V, I> {
                     let ty = vocabulary.insert(Iri::new($iri).unwrap());
                     ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Any(

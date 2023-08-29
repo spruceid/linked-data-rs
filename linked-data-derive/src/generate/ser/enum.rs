@@ -143,8 +143,8 @@ pub fn generate(
 		{
 			fn interpret(
 				&self,
-				interpretation: &mut I,
-				vocabulary: &mut V
+				vocabulary: &mut V,
+				interpretation: &mut I
 			) -> linked_data::ResourceInterpretation<V, I> {
 				match self {
 					#(#lexical_repr_cases)*
@@ -284,8 +284,8 @@ fn variant_interpret(
 				quote! {
 					<#ty as ::linked_data::Interpret<V, I>>::interpret(
 						#id,
-						interpretation,
-						vocabulary
+						vocabulary,
+						interpretation
 					)
 				}
 			}
@@ -294,7 +294,7 @@ fn variant_interpret(
 				let input = &variant.input;
 
 				quote! {
-					::linked_data::InterpretRef::interpret_ref(&#inner_id #input, interpretation, vocabulary)
+					::linked_data::InterpretRef::interpret_ref(&#inner_id #input, vocabulary, interpretation)
 				}
 			}
 			VariantShape::Unit => {
@@ -681,7 +681,7 @@ fn variant_subject_type(
 			});
 
 			quote! {
-				#field_access.interpret(interpretation, vocabulary)
+				#field_access.interpret(vocabulary, interpretation)
 			}
 		}
 		None => quote! {
@@ -704,8 +704,8 @@ fn variant_subject_type(
 		{
 			fn interpret(
 				&self,
+				vocabulary: &mut V,
 				interpretation: &mut I,
-				vocabulary: &mut V
 			) -> linked_data::ResourceInterpretation<V, I> {
 				let #subject_id #input = self;
 				#term
@@ -720,8 +720,8 @@ fn variant_subject_type(
 		{
 			fn interpret_ref(
 				&self,
+				vocabulary: &mut V,
 				interpretation: &mut I,
-				vocabulary: &mut V
 			) -> linked_data::ResourceInterpretation<'_nest, V, I> {
 				let #subject_id #input = self;
 				#term
