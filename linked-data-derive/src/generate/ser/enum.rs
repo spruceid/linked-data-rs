@@ -60,12 +60,8 @@ pub fn generate(
 		let variant_id = &variant.ident;
 		let input = &variant.input;
 
-		let lexical_repr_case = variant_interpret(
-			&variant,
-			nest.as_deref(),
-			&shape,
-			&mut lexical_repr_bounds,
-		);
+		let lexical_repr_case =
+			variant_interpret(&variant, nest.as_deref(), &shape, &mut lexical_repr_bounds);
 
 		lexical_repr_cases.push(quote! {
 			Self::#variant_id #input => {

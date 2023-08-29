@@ -1,18 +1,17 @@
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::spanned::Spanned;
 
-use crate::generate::{TypeAttributes, read_field_attributes};
+use crate::generate::{read_field_attributes, TypeAttributes};
 
 use super::Error;
 
 fn generate_field(
 	attrs: Vec<syn::Attribute>,
-	ty: &syn::Type,
-	cases: &mut Vec<TokenStream>
+	_ty: &syn::Type,
+	_cases: &mut Vec<TokenStream>,
 ) -> Result<TokenStream, Error> {
-	let attrs = read_field_attributes(attrs)?;
-	
+	let _attrs = read_field_attributes(attrs)?;
+
 	// let iri = attrs.iri
 
 	// Ok(quote! {
@@ -24,16 +23,18 @@ fn generate_field(
 }
 
 pub fn generate(
-	attrs: &TypeAttributes,
+	_attrs: &TypeAttributes,
 	ident: Ident,
 	s: syn::DataStruct,
 ) -> Result<TokenStream, Error> {
 	let mut cases = Vec::with_capacity(s.fields.len());
 	let data_struct = match s.fields {
-		syn::Fields::Unit => quote!(struct Data;),
+		syn::Fields::Unit => quote!(
+			struct Data;
+		),
 		syn::Fields::Unnamed(fields) => {
 			let mut opt_fields = Vec::with_capacity(fields.unnamed.len());
-			for (i, f) in fields.unnamed.into_iter().enumerate() {
+			for (_i, f) in fields.unnamed.into_iter().enumerate() {
 				// let index = syn::Index {
 				// 	index: i as u32,
 				// 	span: f.span()
@@ -90,7 +91,7 @@ pub fn generate(
 						}
 
 						Ok(Self {
-							
+
 						})
 					}
 				}

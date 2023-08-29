@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use iref::{InvalidIri, IriBuf};
-use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DeriveInput};
+use proc_macro2::{Span, TokenStream, TokenTree};
 
-pub mod ser;
+use syn::spanned::Spanned;
+
 pub mod de;
+pub mod ser;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -70,7 +70,7 @@ pub enum AttributeError {
 	MissingType,
 
 	#[error("invalid type")]
-	InvalidType
+	InvalidType,
 }
 
 pub struct CompactIri(IriBuf, Span);
@@ -88,7 +88,7 @@ impl CompactIri {
 
 pub struct TypeAttributes {
 	prefixes: HashMap<String, String>,
-	type_: Option<CompactIri>
+	type_: Option<CompactIri>,
 }
 
 pub struct FieldAttributes {
@@ -104,7 +104,7 @@ pub struct VariantAttributes {
 fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttributes, Error> {
 	let mut result = TypeAttributes {
 		prefixes: HashMap::new(),
-		type_: None
+		type_: None,
 	};
 
 	for attr in attributes {
@@ -138,42 +138,44 @@ fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttribute
 								}
 							} else if id == "type" {
 								match tokens.next() {
-									Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
-										match tokens.next() {
-											Some(TokenTree::Literal(l)) => {
-												let span = l.span();
-												match syn::Lit::new(l) {
-													syn::Lit::Str(s) => {
-														match IriBuf::new(s.value()) {
-															Ok(iri) => {
-																result.type_ = Some(CompactIri(iri, span))
-															}
-															Err(_) => return Err(Error::InvalidAttribute(
-																AttributeError::InvalidType,
-																span,
-															))
-														}
+									Some(TokenTree::Punct(p)) if p.as_char() == '=' => match tokens
+										.next()
+									{
+										Some(TokenTree::Literal(l)) => {
+											let span = l.span();
+											match syn::Lit::new(l) {
+												syn::Lit::Str(s) => match IriBuf::new(s.value()) {
+													Ok(iri) => {
+														result.type_ = Some(CompactIri(iri, span))
 													}
-													_ => return Err(Error::InvalidAttribute(
+													Err(_) => {
+														return Err(Error::InvalidAttribute(
+															AttributeError::InvalidType,
+															span,
+														))
+													}
+												},
+												_ => {
+													return Err(Error::InvalidAttribute(
 														AttributeError::InvalidType,
 														span,
 													))
 												}
 											}
-											Some(token) => {
-												return Err(Error::InvalidAttribute(
-													AttributeError::UnexpectedToken,
-													token.span(),
-												))
-											}
-											None => {
-												return Err(Error::InvalidAttribute(
-													AttributeError::MissingType,
-													span,
-												))
-											}
 										}
-									}
+										Some(token) => {
+											return Err(Error::InvalidAttribute(
+												AttributeError::UnexpectedToken,
+												token.span(),
+											))
+										}
+										None => {
+											return Err(Error::InvalidAttribute(
+												AttributeError::MissingType,
+												span,
+											))
+										}
+									},
 									Some(token) => {
 										return Err(Error::InvalidAttribute(
 											AttributeError::UnexpectedToken,

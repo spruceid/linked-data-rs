@@ -51,11 +51,8 @@ pub trait InterpretRef<'a, V: Vocabulary, I: Interpretation> {
 
 /// Type that can have an interpretation.
 pub trait Interpret<V: Vocabulary, I: Interpretation> {
-	fn interpret<'a>(
-		&self,
-		interpretation: &mut I,
-		vocabulary: &mut V,
-	) -> ResourceInterpretation<V, I>;
+	fn interpret(&self, interpretation: &mut I, vocabulary: &mut V)
+		-> ResourceInterpretation<V, I>;
 }
 
 /// Anonymous lexical representation.

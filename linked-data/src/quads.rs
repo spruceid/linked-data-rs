@@ -163,11 +163,11 @@ where
 	) -> Result<Self::Subject, Error> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(&r).next() {
+				if let Some(iri) = interpretation.iris_of(r).next() {
 					return Ok(Id::Iri(iri.clone()));
 				}
 
-				if let Some(blank_id) = interpretation.blank_ids_of(&r).next() {
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
 					return Ok(Id::Blank(blank_id.clone()));
 				}
 
@@ -189,7 +189,7 @@ where
 	) -> Result<Self::Predicate, Error> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(&r).next() {
+				if let Some(iri) = interpretation.iris_of(r).next() {
 					return Ok(iri.clone());
 				}
 
@@ -211,15 +211,15 @@ where
 	) -> Result<Self::Object, Error> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(&r).next() {
+				if let Some(iri) = interpretation.iris_of(r).next() {
 					return Ok(Term::Id(Id::Iri(iri.clone())));
 				}
 
-				if let Some(lit) = interpretation.literals_of(&r).next() {
+				if let Some(lit) = interpretation.literals_of(r).next() {
 					return Ok(Term::Literal(lit.clone()));
 				}
 
-				if let Some(blank_id) = interpretation.blank_ids_of(&r).next() {
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
 					return Ok(Term::Id(Id::Blank(blank_id.clone())));
 				}
 
@@ -251,11 +251,11 @@ where
 	) -> Result<Self::Subject, Error> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(&r).next() {
+				if let Some(iri) = interpretation.iris_of(r).next() {
 					return Ok(Id::Iri(iri.clone()));
 				}
 
-				if let Some(blank_id) = interpretation.blank_ids_of(&r).next() {
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
 					return Ok(Id::Blank(blank_id.clone()));
 				}
 
@@ -337,7 +337,7 @@ where
 				Some(CowRdfTerm::Owned(Term::Id(Id::Iri(iri)))) => {
 					Ok(interpretation.interpret_iri(iri))
 				}
-				Some(CowRdfTerm::Owned(Term::Id(Id::Iri(iri)))) => {
+				Some(CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri)))) => {
 					Ok(interpretation.interpret_iri(iri.clone()))
 				}
 				_ => Err(Error::Predicate),
@@ -542,7 +542,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 		L: ?Sized + Interpret<V, I>,
 		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
 	{
-		let subject = self.subject.into_subject(&self.domain)?;
+		let subject = self.subject.into_subject(self.domain)?;
 
 		let i = predicate.interpret(self.interpretation, self.vocabulary);
 		let term = self
@@ -566,7 +566,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 	where
 		T: ?Sized + LinkedDataGraph<V, I>,
 	{
-		let graph = self.subject.into_subject(&self.domain)?;
+		let graph = self.subject.into_subject(self.domain)?;
 
 		let graph_serializer = QuadGraphSerializer {
 			vocabulary: self.vocabulary,
