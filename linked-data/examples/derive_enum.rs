@@ -1,4 +1,4 @@
-use linked_data::{to_quads, LexicalRepresentation, LinkedData};
+use linked_data::{to_quads, Interpret, LinkedData};
 use rdf_types::{generator, RdfDisplay};
 
 #[derive(LinkedData)]
@@ -29,7 +29,7 @@ enum PropertyCompound {
 
 fn main() {
 	let a = Subject::Name("A".to_string());
-	println!("{}", a.lexical_representation(&mut (), &mut ()).unwrap());
+	println!("{:?}", a.interpret(&mut (), &mut ()));
 
 	println!();
 	let b = SubjectCompound::Name("B".to_string());

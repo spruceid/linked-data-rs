@@ -60,7 +60,7 @@ pub fn generate(
 		let variant_id = &variant.ident;
 		let input = &variant.input;
 
-		let lexical_repr_case = variant_lexical_representation(
+		let lexical_repr_case = variant_interpret(
 			&variant,
 			nest.as_deref(),
 			&shape,
@@ -139,16 +139,17 @@ pub fn generate(
 	Ok(quote! {
 		#(#compound_types)*
 
-		impl<V, I> ::linked_data::LexicalRepresentation<V, I> for #ident
+		impl<V, I> ::linked_data::Interpret<V, I> for #ident
 		where
 			V: ::linked_data::rdf_types::Vocabulary,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#lexical_repr_bounds),*
 		{
-			fn lexical_representation(
+			fn interpret(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::linked_data::RdfTerm<V>> {
+			) -> linked_data::ResourceInterpretation<V, I> {
 				match self {
 					#(#lexical_repr_cases)*
 				}
@@ -158,6 +159,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataSubject<V, I> for #ident
 		where
 			V: #visit_subject_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_subject_bounds),*
 		{
 			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -173,6 +175,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #ident
 		where
 			V: #visit_predicate_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_predicate_bounds),*
 		{
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -188,6 +191,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataGraph<V, I> for #ident
 		where
 			V: #visit_graph_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_graph_bounds),*
 		{
 			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -203,6 +207,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedData<V, I> for #ident
 		where
 			V: #visit_ld_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_ld_bounds),*
 		{
 			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -249,7 +254,7 @@ impl StrippedVariant {
 	}
 }
 
-fn variant_lexical_representation(
+fn variant_interpret(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
@@ -259,12 +264,12 @@ fn variant_lexical_representation(
 		match shape {
 			VariantShape::Simple(_, _) => {
 				quote! {
-					None
+					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
 			}
 			VariantShape::Compound(_inner_ty) => {
 				quote! {
-					None
+					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
 			}
 			VariantShape::Unit => {
@@ -277,11 +282,11 @@ fn variant_lexical_representation(
 		match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(quote! {
-					#ty: ::linked_data::LexicalRepresentation<V, I>
+					#ty: ::linked_data::Interpret<V, I>
 				});
 
 				quote! {
-					<#ty as ::linked_data::LexicalRepresentation<V, I>>::lexical_representation(
+					<#ty as ::linked_data::Interpret<V, I>>::interpret(
 						#id,
 						interpretation,
 						vocabulary
@@ -293,12 +298,12 @@ fn variant_lexical_representation(
 				let input = &variant.input;
 
 				quote! {
-					#inner_id #input .lexical_representation(interpretation, vocabulary)
+					::linked_data::InterpretRef::interpret_ref(&#inner_id #input, interpretation, vocabulary)
 				}
 			}
 			VariantShape::Unit => {
 				quote! {
-					None
+					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
 			}
 		}
@@ -399,7 +404,7 @@ fn variant_visit_predicate(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
 					});
 
 					quote! {
@@ -476,7 +481,7 @@ fn variant_visit_graph(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
 					});
 
 					quote! {
@@ -553,7 +558,7 @@ fn variant_serialize(
 			match shape {
 				VariantShape::Simple(id, ty) => {
 					bounds.push(quote! {
-						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::LexicalRepresentation<V, I>
+						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
 					});
 
 					quote! {
@@ -672,19 +677,19 @@ fn variant_subject_type(
 	let term = match compound_fields.id_field {
 		Some((field_access, ty)) => {
 			// bounds.push(quote! {
-			// 	#ty: ::linked_data::LexicalRepresentation<V, I>
+			// 	#ty: ::linked_data::Interpret<V, I>
 			// });
 
 			lexical_repr_bounds.push(quote! {
-				#ty: ::linked_data::LexicalRepresentation<V, I>
+				#ty: ::linked_data::Interpret<V, I>
 			});
 
 			quote! {
-				#field_access.lexical_representation(interpretation, vocabulary)
+				#field_access.interpret(interpretation, vocabulary)
 			}
 		}
 		None => quote! {
-			None
+			::linked_data::ResourceInterpretation::Uninterpreted(None)
 		},
 	};
 
@@ -695,16 +700,33 @@ fn variant_subject_type(
 		#[allow(non_camel_case_types)]
 		struct #subject_id<'_nest> #borrowed_fields;
 
-		impl<'_nest, V, I> ::linked_data::LexicalRepresentation<V, I> for #subject_id<'_nest>
+		impl<'_nest, V, I> ::linked_data::Interpret<V, I> for #subject_id<'_nest>
 		where
 			V: ::linked_data::rdf_types::Vocabulary,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#lexical_repr_bounds),*
 		{
-			fn lexical_representation(
+			fn interpret(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::linked_data::RdfTerm<V>> {
+			) -> linked_data::ResourceInterpretation<V, I> {
+				let #subject_id #input = self;
+				#term
+			}
+		}
+
+		impl<'_nest, V, I> ::linked_data::InterpretRef<'_nest, V, I> for #subject_id<'_nest>
+		where
+			V: ::linked_data::rdf_types::Vocabulary,
+			I: ::linked_data::rdf_types::Interpretation,
+			#(#lexical_repr_bounds),*
+		{
+			fn interpret_ref(
+				&self,
+				interpretation: &mut I,
+				vocabulary: &mut V
+			) -> linked_data::ResourceInterpretation<'_nest, V, I> {
 				let #subject_id #input = self;
 				#term
 			}
@@ -713,6 +735,7 @@ fn variant_subject_type(
 		impl<'_nest, V, I> ::linked_data::LinkedDataSubject<V, I> for #subject_id<'_nest>
 		where
 			V: #visit_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_bounds),*
 		{
 			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -727,6 +750,7 @@ fn variant_subject_type(
 		impl<'_nest, V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #subject_id<'_nest>
 		where
 			V: #visit_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_bounds),*
 		{
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -741,6 +765,7 @@ fn variant_subject_type(
 		impl<'_nest, V, I> ::linked_data::LinkedDataGraph<V, I> for #subject_id<'_nest>
 		where
 			V: #visit_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_bounds),*
 		{
 			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -755,6 +780,7 @@ fn variant_subject_type(
 		impl<'_nest, V, I> ::linked_data::LinkedData<V, I> for #subject_id<'_nest>
 		where
 			V: #visit_vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#visit_bounds),*
 		{
 			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>

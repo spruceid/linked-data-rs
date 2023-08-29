@@ -17,6 +17,7 @@ struct Foo {
 
 #[derive(LinkedData)]
 #[ld(prefix("ex" = "http://example.org/"))]
+#[ld(type = "http://example.org/Bar")]
 struct Bar {
 	#[ld(id)]
 	id: IriBuf,

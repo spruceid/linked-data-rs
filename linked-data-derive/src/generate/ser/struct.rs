@@ -32,29 +32,30 @@ pub fn generate(
 	let term = match fields.id_field {
 		Some((field_access, ty)) => {
 			bounds.push(quote! {
-				#ty: ::linked_data::LexicalRepresentation<V, I>
+				#ty: ::linked_data::Interpret<V, I>
 			});
 
 			quote! {
-				#field_access.lexical_representation(interpretation, vocabulary)
+				#field_access.interpret(interpretation, vocabulary)
 			}
 		}
 		None => quote! {
-			None
+			::linked_data::ResourceInterpretation::Uninterpreted(None)
 		},
 	};
 
 	Ok(quote! {
-		impl<V, I> ::linked_data::LexicalRepresentation<V, I> for #ident
+		impl<V, I> ::linked_data::Interpret<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#bounds),*
 		{
-			fn lexical_representation(
+			fn interpret(
 				&self,
 				interpretation: &mut I,
 				vocabulary: &mut V
-			) -> Option<::linked_data::RdfTerm<V>> {
+			) -> linked_data::ResourceInterpretation<V, I> {
 				#term
 			}
 		}
@@ -62,6 +63,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataSubject<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#bounds),*
 		{
 			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -75,6 +77,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#bounds),*
 		{
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -89,6 +92,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedDataGraph<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#bounds),*
 		{
 			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
@@ -103,6 +107,7 @@ pub fn generate(
 		impl<V, I> ::linked_data::LinkedData<V, I> for #ident
 		where
 			V: #vocabulary_bounds,
+			I: ::linked_data::rdf_types::Interpretation,
 			#(#bounds),*
 		{
 			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>

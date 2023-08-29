@@ -8,7 +8,7 @@ default = ["derive"]
 derive = ["linked-data-derive"]
 
 [dependencies]
-rdf-types = "0.16"
+rdf-types = "0.16.1"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 static-iref = "3.0"
@@ -16,6 +16,7 @@ json-syntax = "0.9.5"
 iref.workspace = true
 linked-data-derive = { workspace = true, optional = true }
 thiserror.workspace = true
+educe = "0.4.22"
 
 [[example]]
 name = "derive"

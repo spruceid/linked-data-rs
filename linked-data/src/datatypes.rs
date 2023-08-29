@@ -4,28 +4,28 @@ use rdf_types::{
 };
 
 use crate::{
-	LexicalRepresentation, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
-	RdfLiteral, RdfTerm,
+	CowRdfTerm, Interpret, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
+	RdfLiteral, ResourceInterpretation,
 };
 
 macro_rules! datatype {
     ($($ty:ident : $iri:literal),*) => {
         $(
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LexicalRepresentation<V, I> for $ty
+            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
             where
                 V::Value: From<String>,
                 V::Type: From<Type<V::Iri, V::LanguageTag>>,
             {
-                fn lexical_representation(
+                fn interpret(
                     &self,
                     _interpretation: &mut I,
                     vocabulary: &mut V
-                ) -> Option<RdfTerm<V>> {
+                ) -> ResourceInterpretation<V, I> {
                     let ty = vocabulary.insert(Iri::new($iri).unwrap());
-                    Some(Term::Literal(RdfLiteral::Any(
+                    ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Any(
                         self.to_string(),
                         Type::Any(ty).into(),
-                    )))
+                    )))))
                 }
             }
 

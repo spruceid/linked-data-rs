@@ -11,7 +11,7 @@ mod generate;
 #[proc_macro_error]
 pub fn derive_answer_fn(item: TokenStream) -> TokenStream {
 	let input = syn::parse_macro_input!(item as DeriveInput);
-	match generate::subject(input) {
+	match generate::ser::subject(input) {
 		Ok(tokens) => tokens.into(),
 		Err(e) => {
 			abort!(e.span(), e)

@@ -23,7 +23,7 @@
 //! ```
 #[cfg(feature = "derive")]
 pub use linked_data_derive::LinkedData;
-use rdf_types::Vocabulary;
+use rdf_types::{Interpretation, Vocabulary};
 
 #[doc(hidden)]
 pub use iref;
@@ -34,7 +34,7 @@ pub use rdf_types;
 mod anonymous;
 mod datatypes;
 mod graph;
-mod lexical_representation;
+mod interpret;
 mod predicate;
 mod quads;
 mod rdf;
@@ -42,24 +42,37 @@ mod subject;
 
 pub use anonymous::*;
 pub use graph::*;
-pub use lexical_representation::*;
+pub use interpret::*;
 pub use predicate::*;
-pub use quads::{to_quads, to_quads_with, QuadSerializer};
+pub use quads::{to_interpreted_quads, to_quads, to_quads_with};
 pub use rdf::*;
 pub use subject::*;
+
+#[derive(Debug, thiserror::Error)]
+pub enum FromLinkedDataError {
+	// ...
+}
 
 /// Linked-Data type.
 ///
 /// A Linked-Data type represents an RDF dataset which can be visited using the
 /// [`visit`](Self::visit) method.
-pub trait LinkedData<V: Vocabulary = (), I = ()> {
+pub trait LinkedData<V: Vocabulary = (), I: Interpretation = ()> {
 	/// Visit the RDF dataset represented by this type.
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<V, I>;
 }
 
-impl<'a, V: Vocabulary, I, T: LinkedData<V, I>> LinkedData<V, I> for &'a T {
+pub trait LinkedDataDeserialize<V: Vocabulary = (), I: Interpretation = ()>: Sized {
+	fn deserialize_ld(
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: &impl LinkedData<V, I>,
+	) -> Result<Self, FromLinkedDataError>;
+}
+
+impl<'a, V: Vocabulary, I: Interpretation, T: LinkedData<V, I>> LinkedData<V, I> for &'a T {
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<V, I>,
@@ -69,7 +82,7 @@ impl<'a, V: Vocabulary, I, T: LinkedData<V, I>> LinkedData<V, I> for &'a T {
 }
 
 /// RDF dataset visitor.
-pub trait Visitor<V: Vocabulary, I> {
+pub trait Visitor<V: Vocabulary, I: Interpretation> {
 	/// Type of the value returned by the visitor when the dataset has been
 	/// entirely visited.
 	type Ok;
@@ -85,14 +98,14 @@ pub trait Visitor<V: Vocabulary, I> {
 	/// Visits a named graph of the dataset.
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LexicalRepresentation<V, I> + LinkedDataGraph<V, I>;
+		T: ?Sized + Interpret<V, I> + LinkedDataGraph<V, I>;
 
 	/// Ends the dataset visit.
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Any mutable reference to a visitor is itself a visitor.
-impl<'s, V: Vocabulary, I, S: Visitor<V, I>> Visitor<V, I> for &'s mut S {
+impl<'s, V: Vocabulary, I: Interpretation, S: Visitor<V, I>> Visitor<V, I> for &'s mut S {
 	type Ok = ();
 	type Error = S::Error;
 
@@ -105,7 +118,7 @@ impl<'s, V: Vocabulary, I, S: Visitor<V, I>> Visitor<V, I> for &'s mut S {
 
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LexicalRepresentation<V, I> + LinkedDataGraph<V, I>,
+		T: ?Sized + Interpret<V, I> + LinkedDataGraph<V, I>,
 	{
 		S::named_graph(self, value)
 	}
