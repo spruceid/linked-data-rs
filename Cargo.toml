@@ -10,4 +10,5 @@ resolver = "2"
 linked-data = { version = "0.1", path = "linked-data" }
 linked-data-derive = { version = "0.1", path = "linked-data-derive" }
 iref = "3.0"
+static-iref = "3.0"
 thiserror = "1.0.47"

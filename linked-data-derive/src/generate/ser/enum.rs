@@ -1,15 +1,16 @@
 use iref::{Iri, IriBuf};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, TokenStream, Span};
 use quote::{format_ident, quote};
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, punctuated::Punctuated};
 
-use crate::generate::{read_variant_attributes, TypeAttributes, VariantAttributes};
+use crate::generate::{read_variant_attributes, TypeAttributes, VariantAttributes, extend_generics};
 
 use super::{variant_compound_fields, Error, VocabularyBounds};
 
 pub fn generate(
 	attrs: &TypeAttributes,
 	ident: Ident,
+	generics: syn::Generics,
 	e: syn::DataEnum,
 ) -> Result<TokenStream, Error> {
 	let mut lexical_repr_bounds = Vec::new();
@@ -43,7 +44,7 @@ pub fn generate(
 		let variant = StrippedVariant::new(variant.ident, variant.fields);
 
 		let nest = variant_nest(attrs, &variant_attrs)?;
-		let shape = variant_shape(attrs, &ident, &variant)?;
+		let shape = variant_shape(attrs, &ident, &generics, &variant)?;
 
 		if nest.is_some() {
 			if !nested {
@@ -132,15 +133,30 @@ pub fn generate(
 		last_variant_span = Some(span)
 	}
 
+	lexical_repr_bounds.push(syn::parse2(quote! {
+		V: ::linked_data::rdf_types::Vocabulary
+	}).unwrap());
+	lexical_repr_bounds.push(syn::parse2(quote! {
+		I: ::linked_data::rdf_types::Interpretation
+	}).unwrap());
+
+	let repr_generics = extend_generics(&generics, VocabularyBounds::default(), lexical_repr_bounds);
+	let subject_generics = extend_generics(&generics, visit_subject_vocabulary_bounds, visit_subject_bounds);
+	let predicate_generics = extend_generics(&generics, visit_predicate_vocabulary_bounds, visit_predicate_bounds);
+	let graph_generics = extend_generics(&generics, visit_graph_vocabulary_bounds, visit_graph_bounds);
+	let dataset_generics = extend_generics(&generics, visit_ld_vocabulary_bounds, visit_ld_bounds);
+
+	let (_, ty_generics, _) = generics.split_for_impl();
+	let (repr_impl_generics, _, repr_where_clauses) = repr_generics.split_for_impl();
+	let (subject_impl_generics, _, subject_where_clauses) = subject_generics.split_for_impl();
+	let (predicate_impl_generics, _, predicate_where_clauses) = predicate_generics.split_for_impl();
+	let (graph_impl_generics, _, graph_where_clauses) = graph_generics.split_for_impl();
+	let (dataset_impl_generics, _, dataset_where_clauses) = dataset_generics.split_for_impl();
+
 	Ok(quote! {
 		#(#compound_types)*
 
-		impl<V, I> ::linked_data::Interpret<V, I> for #ident
-		where
-			V: ::linked_data::rdf_types::Vocabulary,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#lexical_repr_bounds),*
-		{
+		impl #repr_impl_generics ::linked_data::Interpret<V, I> for #ident #ty_generics #repr_where_clauses {
 			fn interpret(
 				&self,
 				vocabulary: &mut V,
@@ -152,12 +168,7 @@ pub fn generate(
 			}
 		}
 
-		impl<V, I> ::linked_data::LinkedDataSubject<V, I> for #ident
-		where
-			V: #visit_subject_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_subject_bounds),*
-		{
+		impl #subject_impl_generics ::linked_data::LinkedDataSubject<V, I> for #ident #ty_generics #subject_where_clauses {
 			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::SubjectVisitor<V, I>
@@ -168,12 +179,7 @@ pub fn generate(
 			}
 		}
 
-		impl<V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #ident
-		where
-			V: #visit_predicate_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_predicate_bounds),*
-		{
+		impl #predicate_impl_generics ::linked_data::LinkedDataPredicateObjects<V, I> for #ident #ty_generics #predicate_where_clauses {
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::PredicateObjectsVisitor<V, I>
@@ -184,12 +190,7 @@ pub fn generate(
 			}
 		}
 
-		impl<V, I> ::linked_data::LinkedDataGraph<V, I> for #ident
-		where
-			V: #visit_graph_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_graph_bounds),*
-		{
+		impl #graph_impl_generics ::linked_data::LinkedDataGraph<V, I> for #ident #ty_generics #graph_where_clauses {
 			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::GraphVisitor<V, I>
@@ -200,12 +201,7 @@ pub fn generate(
 			}
 		}
 
-		impl<V, I> ::linked_data::LinkedData<V, I> for #ident
-		where
-			V: #visit_ld_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_ld_bounds),*
-		{
+		impl #dataset_impl_generics ::linked_data::LinkedData<V, I> for #ident #ty_generics #dataset_where_clauses {
 			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::Visitor<V, I>
@@ -250,11 +246,168 @@ impl StrippedVariant {
 	}
 }
 
+pub trait UsesGenericParam {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool;
+}
+
+impl UsesGenericParam for StrippedVariant {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		self.fields.iter().any(|f| f.ty.uses_generic_param(p))
+	}
+}
+
+impl UsesGenericParam for syn::Type {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match self {
+			Self::Array(a) => {
+				a.elem.uses_generic_param(p)
+			}
+			Self::BareFn(t) => {
+				t.inputs.iter().any(|i| i.ty.uses_generic_param(p)) || t.output.uses_generic_param(p)
+			}
+			Self::Group(g) => {
+				g.elem.uses_generic_param(p)
+			}
+			Self::ImplTrait(t) => {
+				t.bounds.iter().any(|b| b.uses_generic_param(p))
+			}
+			Self::Paren(t) => t.elem.uses_generic_param(p),
+			Self::Path(t) => t.uses_generic_param(p),
+			Self::Ptr(t) => t.elem.uses_generic_param(p),
+			Self::Reference(t) => {
+				if let Some(l) = &t.lifetime {
+					if l.uses_generic_param(p) {
+						return true
+					}
+				}
+
+				t.elem.uses_generic_param(p)
+			}
+			Self::Slice(t) => t.elem.uses_generic_param(p),
+			Self::TraitObject(t) => {
+				t.bounds.iter().any(|b| b.uses_generic_param(p))
+			}
+			Self::Tuple(t) => {
+				t.elems.iter().any(|t| t.uses_generic_param(p))
+			}
+			_ => false
+		}
+	}
+}
+
+impl UsesGenericParam for syn::TypePath {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		if let Some(qself) = &self.qself {
+			if qself.ty.uses_generic_param(p) {
+				return true
+			}
+		}
+
+		self.path.uses_generic_param(p)
+	}
+}
+
+impl UsesGenericParam for syn::ReturnType {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match self {
+			Self::Default => false,
+			Self::Type(_, ty) => ty.uses_generic_param(p)
+		}
+	}
+}
+
+impl UsesGenericParam for syn::TypeParamBound {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match self {
+			Self::Lifetime(l) => l.uses_generic_param(p),
+			Self::Trait(t) => t.uses_generic_param(p),
+			_ => false
+		}
+	}
+}
+
+impl UsesGenericParam for syn::Lifetime {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match p {
+			syn::GenericParam::Lifetime(l) => self.ident == l.lifetime.ident,
+			_ => false
+		}
+	}
+}
+
+impl UsesGenericParam for syn::TraitBound {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		self.path.uses_generic_param(p)
+	}
+}
+
+impl UsesGenericParam for syn::Path {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		if let syn::GenericParam::Type(t) = p {
+			if self.segments.len() == 1 && self.segments.first().unwrap().ident == t.ident {
+				return true
+			}
+		}
+
+		self.segments.iter().any(|s| s.uses_generic_param(p))
+	}
+}
+
+impl UsesGenericParam for syn::PathSegment {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match &self.arguments {
+			syn::PathArguments::None => false,
+			syn::PathArguments::AngleBracketed(a) => {
+				a.args.iter().any(|a| a.uses_generic_param(p))
+			}
+			syn::PathArguments::Parenthesized(a) => {
+				a.inputs.iter().any(|i| i.uses_generic_param(p)) || a.output.uses_generic_param(p)
+			}
+		}
+	}
+}
+
+impl UsesGenericParam for syn::GenericArgument {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		match self {
+			Self::AssocType(a) => a.uses_generic_param(p),
+			Self::Constraint(c) => c.uses_generic_param(p),
+			Self::Lifetime(l) => l.uses_generic_param(p),
+			Self::Type(t) => t.uses_generic_param(p),
+			_ => false
+		}
+	}
+}
+
+impl UsesGenericParam for syn::AssocType {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		if let Some(generics) = &self.generics {
+			if generics.args.iter().any(|a| a.uses_generic_param(p)) {
+				return true
+			}
+		}
+
+		self.ty.uses_generic_param(p)
+	}
+}
+
+impl UsesGenericParam for syn::Constraint {
+	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
+		if let Some(generics) = &self.generics {
+			if generics.args.iter().any(|a| a.uses_generic_param(p)) {
+				return true
+			}
+		}
+
+		self.bounds.iter().any(|b| b.uses_generic_param(p))
+	}
+}
+
 fn variant_interpret(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
-	bounds: &mut Vec<TokenStream>,
+	bounds: &mut Vec<syn::WherePredicate>,
 ) -> TokenStream {
 	if nest.is_some() {
 		match shape {
@@ -263,7 +416,9 @@ fn variant_interpret(
 					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
 			}
-			VariantShape::Compound(_inner_ty) => {
+			VariantShape::Compound(inner_ty) => {
+				bounds.extend(inner_ty.lexical_repr_bounds.iter().cloned());
+				
 				quote! {
 					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
@@ -277,9 +432,9 @@ fn variant_interpret(
 	} else {
 		match shape {
 			VariantShape::Simple(id, ty) => {
-				bounds.push(quote! {
+				bounds.push(syn::parse2(quote! {
 					#ty: ::linked_data::Interpret<V, I>
-				});
+				}).unwrap());
 
 				quote! {
 					<#ty as ::linked_data::Interpret<V, I>>::interpret(
@@ -290,6 +445,7 @@ fn variant_interpret(
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
+				bounds.extend(inner_ty.lexical_repr_bounds.iter().cloned());
 				let inner_id = &inner_ty.ident;
 				let input = &variant.input;
 
@@ -310,7 +466,7 @@ fn variant_visit_subject(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
-	bounds: &mut Vec<TokenStream>,
+	bounds: &mut Vec<syn::WherePredicate>,
 	vocabulary_bounds: &mut VocabularyBounds,
 ) -> TokenStream {
 	match nest {
@@ -320,9 +476,9 @@ fn variant_visit_subject(
 
 			match shape {
 				VariantShape::Simple(id, ty) => {
-					bounds.push(quote! {
+					bounds.push(syn::parse2(quote! {
 						#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
-					});
+					}).unwrap());
 
 					quote! {
 						visitor.predicate(
@@ -357,9 +513,9 @@ fn variant_visit_subject(
 		}
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
-				bounds.push(quote! {
+				bounds.push(syn::parse2(quote! {
 					#ty: ::linked_data::LinkedDataSubject<V, I>
-				});
+				}).unwrap());
 
 				quote! {
 					<#ty as ::linked_data::LinkedDataSubject<V, I>>::visit_subject(#id, visitor)
@@ -389,7 +545,7 @@ fn variant_visit_predicate(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
-	bounds: &mut Vec<TokenStream>,
+	bounds: &mut Vec<syn::WherePredicate>,
 	vocabulary_bounds: &mut VocabularyBounds,
 ) -> TokenStream {
 	match nest {
@@ -399,9 +555,9 @@ fn variant_visit_predicate(
 
 			match shape {
 				VariantShape::Simple(id, ty) => {
-					bounds.push(quote! {
+					bounds.push(syn::parse2(quote! {
 						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
-					});
+					}).unwrap());
 
 					quote! {
 						::linked_data::AnonymousBinding(
@@ -434,9 +590,9 @@ fn variant_visit_predicate(
 		}
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
-				bounds.push(quote! {
+				bounds.push(syn::parse2(quote! {
 					#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
-				});
+				}).unwrap());
 
 				quote! {
 					<#ty as ::linked_data::LinkedDataPredicateObjects<V, I>>::visit_objects(#id, visitor)
@@ -466,7 +622,7 @@ fn variant_visit_graph(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
-	bounds: &mut Vec<TokenStream>,
+	bounds: &mut Vec<syn::WherePredicate>,
 	vocabulary_bounds: &mut VocabularyBounds,
 ) -> TokenStream {
 	match nest {
@@ -476,9 +632,9 @@ fn variant_visit_graph(
 
 			match shape {
 				VariantShape::Simple(id, ty) => {
-					bounds.push(quote! {
+					bounds.push(syn::parse2(quote! {
 						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
-					});
+					}).unwrap());
 
 					quote! {
 						::linked_data::AnonymousBinding(
@@ -511,9 +667,9 @@ fn variant_visit_graph(
 		}
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
-				bounds.push(quote! {
+				bounds.push(syn::parse2(quote! {
 					#ty: ::linked_data::LinkedDataGraph<V, I>
-				});
+				}).unwrap());
 
 				quote! {
 					<#ty as ::linked_data::LinkedDataGraph<V, I>>::visit_graph(#id, visitor)
@@ -543,7 +699,7 @@ fn variant_serialize(
 	variant: &StrippedVariant,
 	nest: Option<&Iri>,
 	shape: &VariantShape,
-	bounds: &mut Vec<TokenStream>,
+	bounds: &mut Vec<syn::WherePredicate>,
 	vocabulary_bounds: &mut VocabularyBounds,
 ) -> TokenStream {
 	match nest {
@@ -553,9 +709,9 @@ fn variant_serialize(
 
 			match shape {
 				VariantShape::Simple(id, ty) => {
-					bounds.push(quote! {
+					bounds.push(syn::parse2(quote! {
 						#ty: ::linked_data::LinkedDataPredicateObjects<V, I> + ::linked_data::Interpret<V, I>
-					});
+					}).unwrap());
 
 					quote! {
 						::linked_data::AnonymousBinding(
@@ -588,9 +744,9 @@ fn variant_serialize(
 		}
 		None => match shape {
 			VariantShape::Simple(id, ty) => {
-				bounds.push(quote! {
+				bounds.push(syn::parse2(quote! {
 					#ty: ::linked_data::LinkedData<V, I>
-				});
+				}).unwrap());
 
 				quote! {
 					<#ty as ::linked_data::LinkedData<V, I>>::visit(#id, visitor)
@@ -618,8 +774,8 @@ fn variant_serialize(
 
 struct VariantSubjectType {
 	ident: Ident,
-	// lexical_repr_bounds: Vec<TokenStream>,
-	visit_bounds: Vec<TokenStream>,
+	lexical_repr_bounds: Vec<syn::WherePredicate>,
+	visit_bounds: Vec<syn::WherePredicate>,
 	visit_vocabulary_bounds: VocabularyBounds,
 	definition: TokenStream,
 }
@@ -627,6 +783,7 @@ struct VariantSubjectType {
 fn variant_subject_type(
 	attrs: &TypeAttributes,
 	ident: &Ident,
+	generics: &syn::Generics,
 	variant: &StrippedVariant,
 ) -> Result<VariantSubjectType, Error> {
 	let compound_fields = variant_compound_fields(
@@ -666,22 +823,22 @@ fn variant_subject_type(
 	};
 
 	let mut lexical_repr_bounds = Vec::new();
-	let visit_bounds = compound_fields.visit.bounds;
+	let mut visit_bounds = compound_fields.visit.bounds;
 	let visit_vocabulary_bounds = compound_fields.visit.vocabulary_bounds;
 	let visit_body = &compound_fields.visit.body;
 
 	let term = match compound_fields.id_field {
 		Some((field_access, ty)) => {
-			// bounds.push(quote! {
-			// 	#ty: ::linked_data::Interpret<V, I>
-			// });
-
-			lexical_repr_bounds.push(quote! {
+			lexical_repr_bounds.push(syn::parse2(quote! {
 				#ty: ::linked_data::Interpret<V, I>
-			});
+			}).unwrap());
+
+			visit_bounds.push(syn::parse2(quote! {
+				#ty: ::linked_data::Interpret<V, I>
+			}).unwrap());
 
 			quote! {
-				#field_access.interpret(vocabulary, interpretation)
+				<#ty as ::linked_data::Interpret::<V, I>>::interpret(&#field_access, vocabulary, interpretation)
 			}
 		}
 		None => quote! {
@@ -692,16 +849,38 @@ fn variant_subject_type(
 	let subject_id = format_ident!("_{ident}_{}", variant.ident);
 	let input = &variant.input;
 
+	let mut nest_generics = syn::Generics {
+		lt_token: Some(Default::default()),
+		params: Punctuated::new(),
+		gt_token: Some(Default::default()),
+		where_clause: None
+	};
+
+	nest_generics.params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+		attrs: Vec::new(),
+		lifetime: syn::Lifetime::new("'_nest", Span::call_site()),
+		colon_token: None,
+		bounds: Punctuated::new()
+	}));
+
+	for p in &generics.params {
+		if variant.uses_generic_param(p) {
+			nest_generics.params.push(p.clone())
+		}
+	}
+
+	let repr_generics = extend_generics(&nest_generics, VocabularyBounds::default(), lexical_repr_bounds.clone());
+	let visit_generics = extend_generics(&nest_generics, visit_vocabulary_bounds, visit_bounds.clone());
+
+	let (def_ty_generics, ty_generics, _) = nest_generics.split_for_impl();
+	let (repr_impl_generics, _, repr_where_clauses) = repr_generics.split_for_impl();
+	let (visit_impl_generics, _, visit_where_clauses) = visit_generics.split_for_impl();
+
 	let definition = quote! {
 		#[allow(non_camel_case_types)]
-		struct #subject_id<'_nest> #borrowed_fields;
+		struct #subject_id #def_ty_generics #borrowed_fields;
 
-		impl<'_nest, V, I> ::linked_data::Interpret<V, I> for #subject_id<'_nest>
-		where
-			V: ::linked_data::rdf_types::Vocabulary,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#lexical_repr_bounds),*
-		{
+		impl #repr_impl_generics ::linked_data::Interpret<V, I> for #subject_id #ty_generics #repr_where_clauses {
 			fn interpret(
 				&self,
 				vocabulary: &mut V,
@@ -712,12 +891,7 @@ fn variant_subject_type(
 			}
 		}
 
-		impl<'_nest, V, I> ::linked_data::InterpretRef<'_nest, V, I> for #subject_id<'_nest>
-		where
-			V: ::linked_data::rdf_types::Vocabulary,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#lexical_repr_bounds),*
-		{
+		impl #repr_impl_generics ::linked_data::InterpretRef<'_nest, V, I> for #subject_id #ty_generics #repr_where_clauses {
 			fn interpret_ref(
 				&self,
 				vocabulary: &mut V,
@@ -728,12 +902,7 @@ fn variant_subject_type(
 			}
 		}
 
-		impl<'_nest, V, I> ::linked_data::LinkedDataSubject<V, I> for #subject_id<'_nest>
-		where
-			V: #visit_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_bounds),*
-		{
+		impl #visit_impl_generics ::linked_data::LinkedDataSubject<V, I> for #subject_id #ty_generics #visit_where_clauses {
 			fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::SubjectVisitor<V, I>
@@ -743,12 +912,7 @@ fn variant_subject_type(
 			}
 		}
 
-		impl<'_nest, V, I> ::linked_data::LinkedDataPredicateObjects<V, I> for #subject_id<'_nest>
-		where
-			V: #visit_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_bounds),*
-		{
+		impl #visit_impl_generics ::linked_data::LinkedDataPredicateObjects<V, I> for #subject_id #ty_generics #visit_where_clauses {
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::PredicateObjectsVisitor<V, I>
@@ -758,12 +922,7 @@ fn variant_subject_type(
 			}
 		}
 
-		impl<'_nest, V, I> ::linked_data::LinkedDataGraph<V, I> for #subject_id<'_nest>
-		where
-			V: #visit_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_bounds),*
-		{
+		impl #visit_impl_generics ::linked_data::LinkedDataGraph<V, I> for #subject_id #ty_generics #visit_where_clauses {
 			fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::GraphVisitor<V, I>
@@ -773,12 +932,7 @@ fn variant_subject_type(
 			}
 		}
 
-		impl<'_nest, V, I> ::linked_data::LinkedData<V, I> for #subject_id<'_nest>
-		where
-			V: #visit_vocabulary_bounds,
-			I: ::linked_data::rdf_types::Interpretation,
-			#(#visit_bounds),*
-		{
+		impl #visit_impl_generics ::linked_data::LinkedData<V, I> for #subject_id #ty_generics #visit_where_clauses {
 			fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: ::linked_data::Visitor<V, I>
@@ -791,7 +945,7 @@ fn variant_subject_type(
 
 	Ok(VariantSubjectType {
 		ident: subject_id,
-		// lexical_repr_bounds,
+		lexical_repr_bounds,
 		visit_bounds,
 		visit_vocabulary_bounds,
 		definition,
@@ -807,11 +961,12 @@ enum VariantShape {
 fn variant_shape(
 	attrs: &TypeAttributes,
 	ident: &Ident,
+	generics: &syn::Generics,
 	variant: &StrippedVariant,
 ) -> Result<VariantShape, Error> {
 	match &variant.fields {
 		syn::Fields::Named(_) => Ok(VariantShape::Compound(variant_subject_type(
-			attrs, ident, variant,
+			attrs, ident, generics, variant,
 		)?)),
 		syn::Fields::Unnamed(unnamed_fields) => {
 			let mut fields_iter = unnamed_fields.unnamed.iter();
@@ -830,7 +985,7 @@ fn variant_shape(
 			}
 
 			Ok(VariantShape::Compound(variant_subject_type(
-				attrs, ident, variant,
+				attrs, ident, generics, variant,
 			)?))
 		}
 		syn::Fields::Unit => Ok(VariantShape::Unit),

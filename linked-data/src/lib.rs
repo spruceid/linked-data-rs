@@ -21,6 +21,7 @@
 //!   email: String
 //! }
 //! ```
+use iref::Iri;
 #[cfg(feature = "derive")]
 pub use linked_data_derive::LinkedData;
 use rdf_types::{Interpretation, Vocabulary};
@@ -44,7 +45,7 @@ pub use anonymous::*;
 pub use graph::*;
 pub use interpret::*;
 pub use predicate::*;
-pub use quads::{to_interpreted_quads, to_quads, to_quads_with};
+pub use quads::{to_interpreted_quads, to_interpreted_subject_quads, to_quads, to_quads_with};
 pub use rdf::*;
 pub use subject::*;
 
@@ -64,20 +65,23 @@ pub trait LinkedData<V: Vocabulary = (), I: Interpretation = ()> {
 		S: Visitor<V, I>;
 }
 
-pub trait LinkedDataDeserialize<V: Vocabulary = (), I: Interpretation = ()>: Sized {
-	fn deserialize_ld(
-		vocabulary: &mut V,
-		interpretation: &mut I,
-		value: &impl LinkedData<V, I>,
-	) -> Result<Self, FromLinkedDataError>;
-}
-
-impl<'a, V: Vocabulary, I: Interpretation, T: LinkedData<V, I>> LinkedData<V, I> for &'a T {
+impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedData<V, I>> LinkedData<V, I>
+	for &'a T
+{
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<V, I>,
 	{
 		T::visit(self, visitor)
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Iri {
+	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: Visitor<V, I>,
+	{
+		visitor.end()
 	}
 }
 
@@ -126,4 +130,12 @@ impl<'s, V: Vocabulary, I: Interpretation, S: Visitor<V, I>> Visitor<V, I> for &
 	fn end(self) -> Result<Self::Ok, Self::Error> {
 		Ok(())
 	}
+}
+
+pub trait LinkedDataDeserialize<V: Vocabulary = (), I: Interpretation = ()>: Sized {
+	fn deserialize_dataset(
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: &impl LinkedData<V, I>,
+	) -> Result<Self, FromLinkedDataError>;
 }

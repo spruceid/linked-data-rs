@@ -27,6 +27,13 @@ enum PropertyCompound {
 	Name(#[ld("ex:value")] String),
 }
 
+#[derive(LinkedData)]
+#[ld(prefix("ex" = "http://example.org/"))]
+enum Ids {
+	#[ld("ex:A")]
+	A,
+}
+
 fn main() {
 	let a = Subject::Name("A".to_string());
 	println!("{:?}", a.interpret(&mut (), &mut ()));

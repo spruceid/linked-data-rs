@@ -10,8 +10,8 @@ mod r#struct;
 pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
 	let attrs = read_type_attributes(input.attrs)?;
 	match input.data {
-		syn::Data::Struct(s) => r#struct::generate(&attrs, input.ident, s),
-		syn::Data::Enum(e) => r#enum::generate(&attrs, input.ident, e),
+		syn::Data::Struct(s) => r#struct::generate(&attrs, input.ident, input.generics, s),
+		syn::Data::Enum(e) => r#enum::generate(&attrs, input.ident, input.generics, e),
 		syn::Data::Union(u) => Err(Error::UnionType(u.union_token.span())),
 	}
 }
@@ -43,7 +43,7 @@ impl ToTokens for VocabularyBounds {
 
 #[derive(Default)]
 pub struct FieldsVisitor {
-	bounds: Vec<TokenStream>,
+	bounds: Vec<syn::WherePredicate>,
 	vocabulary_bounds: VocabularyBounds,
 	body: TokenStream,
 }
@@ -84,9 +84,9 @@ fn variant_compound_fields(
 
 		let field_ref = by_ref(field_access);
 		let visit_field = if field_attrs.flatten {
-			visit.bounds.push(quote!(
+			visit.bounds.push(syn::parse2(quote!(
 				#ty: ::linked_data::LinkedDataSubject<V, I>
-			));
+			)).unwrap());
 
 			quote! {
 				<#ty as ::linked_data::LinkedDataSubject<V, I>>::visit_subject(#field_ref, &mut visitor)?;
@@ -96,9 +96,9 @@ fn variant_compound_fields(
 				Some(compact_iri) => {
 					let iri = compact_iri.expand(&attrs.prefixes)?.into_string();
 					visit.vocabulary_bounds.iri_mut = true;
-					visit.bounds.push(quote!(
+					visit.bounds.push(syn::parse2(quote!(
 						#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
-					));
+					)).unwrap());
 
 					quote! {
 						visitor.predicate(

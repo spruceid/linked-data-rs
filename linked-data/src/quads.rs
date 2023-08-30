@@ -8,7 +8,8 @@ use rdf_types::{
 
 use crate::{
 	CowRdfTerm, GraphVisitor, Interpret, InterpretedQuad, LinkedData, LinkedDataGraph,
-	PredicateObjectsVisitor, RdfId, RdfQuad, ResourceInterpretation, SubjectVisitor, Visitor,
+	LinkedDataSubject, PredicateObjectsVisitor, RdfId, RdfLiteralType, RdfLiteralValue, RdfQuad,
+	ResourceInterpretation, SubjectVisitor, Visitor,
 };
 
 pub fn to_interpreted_quads<V: Vocabulary, I: Interpretation>(
@@ -25,8 +26,8 @@ where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
-	V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
 	V::LanguageTag: Clone,
 {
 	value.visit(QuadSerializer {
@@ -35,6 +36,44 @@ where
 		domain: &mut InterpretationDomain,
 		result: Vec::new(),
 	})
+}
+
+pub fn to_interpreted_subject_quads<V: Vocabulary, I: Interpretation>(
+	vocabulary: &mut V,
+	interpretation: &mut I,
+	graph: Option<&I::Resource>,
+	value: &(impl LinkedDataSubject<V, I> + Interpret<V, I>),
+) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), Error>
+where
+	I: InterpretationMut
+		+ IriInterpretationMut<V::Iri>
+		+ BlankIdInterpretationMut<V::BlankId>
+		+ LiteralInterpretationMut<V::Literal>,
+	I::Resource: Clone,
+	V: IriVocabularyMut + LiteralVocabularyMut,
+	V::Iri: Clone,
+	V::BlankId: Clone,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
+	V::LanguageTag: Clone,
+{
+	let mut result = Vec::new();
+
+	let subject = match value.interpret(vocabulary, interpretation) {
+		ResourceInterpretation::Interpreted(r) => r.clone(),
+		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(),
+	};
+
+	value.visit_subject(QuadPropertiesSerializer {
+		vocabulary,
+		interpretation,
+		domain: &mut InterpretationDomain,
+		graph,
+		subject: SubjectOrObject::Subject(&subject),
+		result: &mut result,
+	})?;
+
+	Ok((subject, result))
 }
 
 pub fn to_quads_with<V: Vocabulary, I: Interpretation>(
@@ -48,8 +87,8 @@ where
 	V::BlankId: Clone,
 	V::Iri: Clone,
 	V::Literal: Clone,
-	V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
-	V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
 	V::LanguageTag: Clone,
 	I: ReverseIriInterpretation<Iri = V::Iri>
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -144,8 +183,8 @@ where
 	V::Iri: Clone,
 	V::BlankId: Clone,
 	V::Literal: Clone,
-	V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
-	V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
 	V::LanguageTag: Clone,
 	I: ReverseIriInterpretation<Iri = V::Iri>
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -289,8 +328,8 @@ where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value<()>>,
-	V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
 	V::LanguageTag: Clone,
 {
 	type Subject = I::Resource;

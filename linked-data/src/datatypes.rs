@@ -1,72 +1,116 @@
-use iref::Iri;
-use rdf_types::{
-	literal::Type, Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary,
-};
+use rdf_types::{Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary};
 
 use crate::{
 	CowRdfTerm, Interpret, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
-	RdfLiteral, ResourceInterpretation,
+	RdfLiteral, RdfLiteralRef, ResourceInterpretation,
 };
 
 macro_rules! datatype {
-    ($($ty:ident : $iri:literal),*) => {
-        $(
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
-            where
-                V::Value: From<String>,
-                V::Type: From<Type<V::Iri, V::LanguageTag>>,
-            {
-                fn interpret(
-                    &self,
-                    vocabulary: &mut V,
-                    _interpretation: &mut I,
-                ) -> ResourceInterpretation<V, I> {
-                    let ty = vocabulary.insert(Iri::new($iri).unwrap());
-                    ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Any(
-                        self.to_string(),
-                        Type::Any(ty).into(),
-                    )))))
-                }
-            }
+	($($ty:ty : $variant:ident),*) => {
+		$(
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn interpret(
+					&self,
+					_vocabulary: &mut V,
+					_interpretation: &mut I,
+				) -> ResourceInterpretation<V, I> {
+					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Xsd(
+						xsd_types::Value::$variant(self.clone())
+					)))))
+				}
+			}
 
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
-            where
-                V::Value: From<String>,
-                V::Type: From<Type<V::Iri, V::LanguageTag>>,
-            {
-                fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
-                where
-                    S: crate::SubjectVisitor<V, I>
-                {
-                    visitor.end()
-                }
-            }
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+				where
+					S: crate::SubjectVisitor<V, I>
+				{
+					visitor.end()
+				}
+			}
 
-            impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
-            where
-                V::Value: From<String>,
-                V::Type: From<Type<V::Iri, V::LanguageTag>>,
-            {
-                fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-                where
-                    S: PredicateObjectsVisitor<V, I>,
-                {
-                    visitor.object(self)?;
-                    visitor.end()
-                }
-            }
-        )*
-    };
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+				where
+					S: PredicateObjectsVisitor<V, I>,
+				{
+					visitor.object(self)?;
+					visitor.end()
+				}
+			}
+		)*
+	};
+}
+
+macro_rules! unsized_datatype {
+	($($ty:ty : $variant:ident),*) => {
+		$(
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn interpret(
+					&self,
+					_vocabulary: &mut V,
+					_interpretation: &mut I,
+				) -> ResourceInterpretation<V, I> {
+					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(RdfLiteralRef::Xsd(
+						xsd_types::ValueRef::$variant(self)
+					)))))
+				}
+			}
+
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+				where
+					S: crate::SubjectVisitor<V, I>
+				{
+					visitor.end()
+				}
+			}
+
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
+			where
+				V::Value: From<String>
+			{
+				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+				where
+					S: PredicateObjectsVisitor<V, I>,
+				{
+					visitor.object(self)?;
+					visitor.end()
+				}
+			}
+		)*
+	};
 }
 
 datatype! {
-	u8: "http://www.w3.org/2001/XMLSchema#unsignedByte",
-	u16: "http://www.w3.org/2001/XMLSchema#unsignedShort",
-	u32: "http://www.w3.org/2001/XMLSchema#unsignedInt",
-	u64: "http://www.w3.org/2001/XMLSchema#unsignedLong",
-	i8: "http://www.w3.org/2001/XMLSchema#byte",
-	i16: "http://www.w3.org/2001/XMLSchema#short",
-	i32: "http://www.w3.org/2001/XMLSchema#int",
-	i64: "http://www.w3.org/2001/XMLSchema#long",
-	String: "http://www.w3.org/2001/XMLSchema#string"
+	u8: UnsignedByte,
+	u16: UnsignedShort,
+	u32: UnsignedInt,
+	u64: UnsignedLong,
+	i8: Byte,
+	i16: Short,
+	i32: Int,
+	i64: Long,
+	String: String,
+	iref::UriBuf: AnyUri,
+	xsd_types::DateTime: DateTime
+}
+
+unsized_datatype! {
+	str: String
 }

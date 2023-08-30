@@ -1,12 +1,13 @@
 use educe::Educe;
 use iref::{Iri, IriBuf};
 use rdf_types::{
-	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut, Term,
-	Vocabulary, interpretation::{ReverseIriInterpretation, ReverseBlankIdInterpretation}, ReverseLiteralInterpretation,
+	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
+	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut,
+	ReverseLiteralInterpretation, Term, Vocabulary,
 };
 use std::fmt;
 
-use crate::{CowRdfTerm, RdfLiteralValue};
+use crate::{AsRdfLiteral, CowRdfTerm};
 
 /// Resource interpretation.
 #[derive(Educe)]
@@ -42,11 +43,13 @@ impl<'a, V: Vocabulary, I: Interpretation> ResourceInterpretation<'a, V, I> {
 	pub fn into_lexical_representation(
 		self,
 		vocabulary: &'a V,
-		interpretation: &'a I
+		interpretation: &'a I,
 	) -> Option<CowRdfTerm<'a, V>>
 	where
-		V::Value: RdfLiteralValue<V>,
-		I: ReverseIriInterpretation<Iri = V::Iri> + ReverseBlankIdInterpretation<BlankId = V::BlankId> + ReverseLiteralInterpretation<Literal = V::Literal>
+		V::Value: AsRdfLiteral<V>,
+		I: ReverseIriInterpretation<Iri = V::Iri>
+			+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
+			+ ReverseLiteralInterpretation<Literal = V::Literal>,
 	{
 		match self {
 			Self::Interpreted(r) => {
@@ -58,10 +61,10 @@ impl<'a, V: Vocabulary, I: Interpretation> ResourceInterpretation<'a, V, I> {
 					let l = vocabulary.literal(l).unwrap();
 					let term = match l.value().as_rdf_literal(vocabulary, l.type_()) {
 						crate::CowRdfLiteral::Borrowed(l) => CowRdfTerm::Borrowed(Term::Literal(l)),
-						crate::CowRdfLiteral::Owned(l) => CowRdfTerm::Owned(Term::Literal(l))
+						crate::CowRdfLiteral::Owned(l) => CowRdfTerm::Owned(Term::Literal(l)),
 					};
 
-					return Some(term)
+					return Some(term);
 				}
 
 				if let Some(b) = interpretation.blank_ids_of(r).next() {
@@ -70,7 +73,7 @@ impl<'a, V: Vocabulary, I: Interpretation> ResourceInterpretation<'a, V, I> {
 
 				None
 			}
-			Self::Uninterpreted(t) => t
+			Self::Uninterpreted(t) => t,
 		}
 	}
 }
@@ -92,13 +95,36 @@ pub trait Interpret<V: Vocabulary, I: Interpretation> {
 	fn lexical_representation<'a>(
 		&'a self,
 		vocabulary: &'a mut V,
-		interpretation: &'a mut I
+		interpretation: &'a mut I,
 	) -> Option<CowRdfTerm<'a, V>>
 	where
-		V::Value: RdfLiteralValue<V>,
-		I: ReverseIriInterpretation<Iri = V::Iri> + ReverseBlankIdInterpretation<BlankId = V::BlankId> + ReverseLiteralInterpretation<Literal = V::Literal>
+		V::Value: AsRdfLiteral<V>,
+		I: ReverseIriInterpretation<Iri = V::Iri>
+			+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
+			+ ReverseLiteralInterpretation<Literal = V::Literal>,
 	{
-		self.interpret(vocabulary, interpretation).into_lexical_representation(vocabulary, interpretation)
+		self.interpret(vocabulary, interpretation)
+			.into_lexical_representation(vocabulary, interpretation)
+	}
+}
+
+impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + Interpret<V, I>> Interpret<V, I> for &'a T {
+	fn interpret(
+		&self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		T::interpret(self, vocabulary, interpretation)
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, T: ?Sized + Interpret<V, I>> Interpret<V, I> for Box<T> {
+	fn interpret(
+		&self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		T::interpret(self, vocabulary, interpretation)
 	}
 }
 

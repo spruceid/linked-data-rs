@@ -1,3 +1,4 @@
+use iref::{Iri, IriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 
 use crate::{Interpret, LinkedDataSubject};
@@ -6,9 +7,38 @@ use crate::{Interpret, LinkedDataSubject};
 
 /// Serialize a Linked-Data graph.
 pub trait LinkedDataGraph<V: Vocabulary, I: Interpretation> {
-	fn visit_graph<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: GraphVisitor<V, I>;
+}
+
+impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
+	for &'a T
+{
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<V, I>,
+	{
+		T::visit_graph(self, visitor)
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Iri {
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<V, I>,
+	{
+		visitor.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for IriBuf {
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<V, I>,
+	{
+		visitor.end()
+	}
 }
 
 pub trait GraphVisitor<V: Vocabulary, I: Interpretation> {

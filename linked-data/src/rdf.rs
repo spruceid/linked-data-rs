@@ -4,8 +4,9 @@ use std::borrow::Borrow;
 use educe::Educe;
 use iref::Iri;
 use rdf_types::{
-	BlankIdVocabulary, Id, InsertIntoVocabulary, Interpretation, IriVocabulary, IriVocabularyMut,
-	LanguageTagVocabulary, LiteralVocabulary, LiteralVocabularyMut, Quad, Term, Vocabulary, literal,
+	literal, BlankIdVocabulary, Id, InsertIntoVocabulary, Interpretation, IriVocabulary,
+	IriVocabularyMut, LanguageTagVocabulary, LiteralVocabulary, LiteralVocabularyMut, Quad, Term,
+	Vocabulary,
 };
 use xsd_types::XsdDatatype;
 
@@ -38,14 +39,14 @@ pub enum CowRdfTerm<'a, V: Vocabulary> {
 
 pub enum CowRef<'a, T> {
 	Borrowed(&'a T),
-	Owned(T)
+	Owned(T),
 }
 
 impl<'a, T> AsRef<T> for CowRef<'a, T> {
 	fn as_ref(&self) -> &T {
 		match self {
 			Self::Borrowed(t) => t,
-			Self::Owned(t) => t
+			Self::Owned(t) => t,
 		}
 	}
 }
@@ -54,13 +55,15 @@ impl<'a, T> Borrow<T> for CowRef<'a, T> {
 	fn borrow(&self) -> &T {
 		match self {
 			Self::Borrowed(t) => t,
-			Self::Owned(t) => t
+			Self::Owned(t) => t,
 		}
 	}
 }
 
 impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
-	pub fn into_term(self) -> Term<Id<CowRef<'a, V::Iri>, CowRef<'a, V::BlankId>>, CowRdfLiteral<'a, V>> {
+	pub fn into_term(
+		self,
+	) -> Term<Id<CowRef<'a, V::Iri>, CowRef<'a, V::BlankId>>, CowRdfLiteral<'a, V>> {
 		match self {
 			Self::Borrowed(Term::Id(Id::Iri(i))) => Term::Id(Id::Iri(CowRef::Borrowed(i))),
 			Self::Borrowed(Term::Id(Id::Blank(b))) => Term::Id(Id::Blank(CowRef::Borrowed(b))),
@@ -99,19 +102,55 @@ impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
 	}
 }
 
-pub trait RdfLiteralValue<V: IriVocabulary + LanguageTagVocabulary + LiteralVocabulary<Value = Self>, M = ()> {
+pub trait RdfLiteralValue<M = ()>:
+	From<String> + From<xsd_types::Value> + From<json_syntax::Value<M>>
+{
+}
+
+impl<M, T: From<String> + From<xsd_types::Value> + From<json_syntax::Value<M>>> RdfLiteralValue<M>
+	for T
+{
+}
+
+pub trait AsRdfLiteral<
+	V: IriVocabulary + LanguageTagVocabulary + LiteralVocabulary<Value = Self>,
+	M = (),
+>
+{
 	fn as_rdf_literal<'a>(&'a self, vocabulary: &V, ty: &'a V::Type) -> CowRdfLiteral<V, M>;
 }
 
-impl<V: IriVocabulary + LanguageTagVocabulary + LiteralVocabulary<Value = Self, Type = literal::Type<V::Iri, V::LanguageTag>>, M> RdfLiteralValue<V, M> for String {
-	fn as_rdf_literal<'a>(&'a self, _vocabulary: &V, ty: &'a <V as LiteralVocabulary>::Type) -> CowRdfLiteral<V, M> {
+impl<
+		V: IriVocabulary
+			+ LanguageTagVocabulary
+			+ LiteralVocabulary<Value = Self, Type = literal::Type<V::Iri, V::LanguageTag>>,
+		M,
+	> AsRdfLiteral<V, M> for String
+{
+	fn as_rdf_literal<'a>(
+		&'a self,
+		_vocabulary: &V,
+		ty: &'a <V as LiteralVocabulary>::Type,
+	) -> CowRdfLiteral<V, M> {
 		let ty = match ty {
 			literal::Type::Any(i) => literal::Type::Any(i),
-			literal::Type::LangString(t) => literal::Type::LangString(t)
+			literal::Type::LangString(t) => literal::Type::LangString(t),
 		};
 
 		CowRdfLiteral::Borrowed(RdfLiteralRef::Any(self, ty))
 	}
+}
+
+pub trait RdfLiteralType<V: IriVocabulary + LanguageTagVocabulary>:
+	From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>
+{
+}
+
+impl<
+		V: IriVocabulary + LanguageTagVocabulary,
+		T: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+	> RdfLiteralType<V> for T
+{
 }
 
 #[derive(Educe)]
@@ -221,7 +260,7 @@ impl<'a, V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteralRef<'a, V, M> {
 
 pub enum CowRdfLiteral<'a, V: IriVocabulary + LanguageTagVocabulary, M = ()> {
 	Borrowed(RdfLiteralRef<'a, V, M>),
-	Owned(RdfLiteral<V, M>)
+	Owned(RdfLiteral<V, M>),
 }
 
 impl<'a, V: IriVocabulary + LanguageTagVocabulary, M> CowRdfLiteral<'a, V, M> {
@@ -229,18 +268,18 @@ impl<'a, V: IriVocabulary + LanguageTagVocabulary, M> CowRdfLiteral<'a, V, M> {
 	where
 		V::Iri: Clone,
 		V::LanguageTag: Clone,
-		M: Clone
+		M: Clone,
 	{
 		match self {
 			Self::Borrowed(l) => l.into_owned(),
-			Self::Owned(l) => l
+			Self::Owned(l) => l,
 		}
 	}
 
 	pub fn as_literal_ref(&self) -> RdfLiteralRef<V, M> {
 		match self {
 			Self::Borrowed(l) => *l,
-			Self::Owned(l) => l.as_literal_ref()
+			Self::Owned(l) => l.as_literal_ref(),
 		}
 	}
 }

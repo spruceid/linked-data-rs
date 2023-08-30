@@ -1,22 +1,41 @@
+use iref::{Iri, IriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 
-use crate::{Interpret, LinkedDataGraph, LinkedDataPredicateObjects};
+use crate::{FromLinkedDataError, Interpret, LinkedDataGraph, LinkedDataPredicateObjects};
 
 /// Serialize a Linked-Data node.
-pub trait LinkedDataSubject<V: Vocabulary, I: Interpretation> {
+pub trait LinkedDataSubject<V: Vocabulary = (), I: Interpretation = ()> {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<V, I>;
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T: LinkedDataSubject<V, I>> LinkedDataSubject<V, I>
-	for &'a T
+impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>>
+	LinkedDataSubject<V, I> for &'a T
 {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<V, I>,
 	{
 		T::visit_subject(self, serializer)
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Iri {
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		serializer.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for IriBuf {
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		serializer.end()
 	}
 }
 
@@ -61,4 +80,12 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 	fn end(self) -> Result<Self::Ok, Self::Error> {
 		Ok(())
 	}
+}
+
+pub trait LinkedDataDeserializeSubject<V: Vocabulary = (), I: Interpretation = ()>: Sized {
+	fn deserialize_subject(
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: &impl LinkedDataSubject<V, I>,
+	) -> Result<Self, FromLinkedDataError>;
 }

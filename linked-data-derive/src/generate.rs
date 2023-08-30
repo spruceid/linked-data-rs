@@ -1,12 +1,18 @@
 use std::collections::HashMap;
 
-use iref::{InvalidIri, IriBuf};
+use iref::{InvalidIri, IriBuf, Iri};
+use quote::{format_ident, quote};
+use static_iref::iri;
 use proc_macro2::{Span, TokenStream, TokenTree};
 
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, punctuated::Punctuated};
+
+use self::ser::VocabularyBounds;
 
 pub mod de;
 pub mod ser;
+
+const RDF_TYPE: &Iri = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -99,6 +105,49 @@ pub struct FieldAttributes {
 
 pub struct VariantAttributes {
 	iri: Option<CompactIri>,
+}
+
+fn extend_generics(
+	generics: &syn::Generics,
+	vocabulary_bounds: VocabularyBounds,
+	mut bounds: Vec<syn::WherePredicate>
+) -> syn::Generics {
+	let mut result = generics.clone();
+
+	result.params.push(syn::GenericParam::Type(syn::TypeParam {
+		attrs: Vec::new(),
+		ident: format_ident!("V"),
+		colon_token: None,
+        bounds: Punctuated::new(),
+        eq_token: None,
+        default: None,
+	}));
+
+	result.params.push(syn::GenericParam::Type(syn::TypeParam {
+		attrs: Vec::new(),
+		ident: format_ident!("I"),
+		colon_token: None,
+        bounds: Punctuated::new(),
+        eq_token: None,
+        default: None,
+	}));
+
+	bounds.push(syn::parse2(quote! {
+		V: #vocabulary_bounds
+	}).unwrap());
+
+	bounds.push(syn::parse2(quote! {
+		I: ::linked_data::rdf_types::Interpretation
+	}).unwrap());
+
+	let where_clause = result.where_clause.get_or_insert(syn::WhereClause {
+		where_token: Default::default(),
+		predicates: Punctuated::new()
+	});
+
+	where_clause.predicates.extend(bounds);
+
+	result
 }
 
 fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttributes, Error> {
@@ -279,6 +328,8 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
 								flatten = true
 							} else if id == "id" {
 								is_id = true
+							} else if id == "type" {
+								iri = Some(CompactIri(RDF_TYPE.to_owned(), id.span()));
 							} else {
 								return Err(Error::InvalidAttribute(
 									AttributeError::UnknownIdent,
@@ -342,38 +393,8 @@ fn read_variant_attributes(attributes: Vec<syn::Attribute>) -> Result<VariantAtt
 			let span = attr.span();
 			match attr.meta {
 				syn::Meta::List(list) => {
-					let mut tokens = list.tokens.into_iter();
-					match tokens.next() {
-						Some(TokenTree::Literal(l)) => {
-							let l = syn::Lit::new(l);
-							match l {
-								syn::Lit::Str(l) => match IriBuf::new(l.value()) {
-									Ok(value) => {
-										iri = Some(CompactIri(value, l.span()));
-									}
-									Err(_) => {
-										return Err(Error::InvalidAttribute(
-											AttributeError::InvalidCompactIri,
-											l.span(),
-										))
-									}
-								},
-								l => {
-									return Err(Error::InvalidAttribute(
-										AttributeError::ExpectedString,
-										l.span(),
-									))
-								}
-							}
-						}
-						Some(token) => {
-							return Err(Error::InvalidAttribute(
-								AttributeError::UnexpectedToken,
-								token.span(),
-							))
-						}
-						None => return Err(Error::InvalidAttribute(AttributeError::Empty, span)),
-					}
+					let VariantAttribute::Iri(i) = read_variant_attribute(list.tokens, span)?;
+					iri = Some(i);
 				}
 				_ => {
 					return Err(Error::InvalidAttribute(
@@ -386,4 +407,49 @@ fn read_variant_attributes(attributes: Vec<syn::Attribute>) -> Result<VariantAtt
 	}
 
 	Ok(VariantAttributes { iri })
+}
+
+enum VariantAttribute {
+	Iri(CompactIri)
+}
+
+fn read_variant_attribute(tokens: TokenStream, span: Span) -> Result<VariantAttribute, Error> {
+	let mut tokens = tokens.into_iter();
+	match tokens.next() {
+		Some(TokenTree::Group(g)) => {
+			read_variant_attribute(g.stream(), span)
+		}
+		Some(TokenTree::Literal(l)) => {
+			let l = syn::Lit::new(l);
+			match l {
+				syn::Lit::Str(l) => match IriBuf::new(l.value()) {
+					Ok(value) => {
+						Ok(VariantAttribute::Iri(CompactIri(value, l.span())))
+					}
+					Err(_) => {
+						Err(Error::InvalidAttribute(
+							AttributeError::InvalidCompactIri,
+							l.span(),
+						))
+					}
+				},
+				l => {
+					Err(Error::InvalidAttribute(
+						AttributeError::ExpectedString,
+						l.span(),
+					))
+				}
+			}
+		}
+		Some(TokenTree::Ident(id)) if id == "type" => {
+			Ok(VariantAttribute::Iri(CompactIri(RDF_TYPE.to_owned(), id.span())))
+		}
+		Some(token) => {
+			Err(Error::InvalidAttribute(
+				AttributeError::UnexpectedToken,
+				token.span(),
+			))
+		}
+		None => Err(Error::InvalidAttribute(AttributeError::Empty, span)),
+	}
 }
