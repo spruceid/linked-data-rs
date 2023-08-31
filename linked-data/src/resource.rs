@@ -201,23 +201,13 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource
 	}
 }
 
-impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
-	LinkedDataResource<V, I> for Id<&'a Iri, &'a BlankId>
-{
-	fn interpretation(
-		&self,
-		vocabulary: &mut V,
-		interpretation: &mut I,
-	) -> ResourceInterpretation<V, I> {
-		match self {
-			Self::Iri(i) => i.interpretation(vocabulary, interpretation),
-			Self::Blank(b) => b.interpretation(vocabulary, interpretation),
-		}
-	}
-}
-
-impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
-	LinkedDataResource<V, I> for Id<IriBuf, BlankIdBuf>
+impl<
+		'a,
+		V: Vocabulary,
+		I: Interpretation,
+		T: LinkedDataResource<V, I>,
+		B: LinkedDataResource<V, I>,
+	> LinkedDataResource<V, I> for Id<T, B>
 {
 	fn interpretation(
 		&self,
