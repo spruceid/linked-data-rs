@@ -51,6 +51,9 @@ pub use iref;
 #[doc(hidden)]
 pub use rdf_types;
 
+#[doc(hidden)]
+pub use xsd_types;
+
 mod anonymous;
 mod datatypes;
 mod graph;

@@ -202,7 +202,6 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource
 }
 
 impl<
-		'a,
 		V: Vocabulary,
 		I: Interpretation,
 		T: LinkedDataResource<V, I>,

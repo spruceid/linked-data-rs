@@ -1,5 +1,7 @@
 use iref::{Iri, IriBuf};
-use rdf_types::{Interpretation, IriVocabularyMut, Vocabulary};
+use rdf_types::{
+	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut, Vocabulary,
+};
 
 use crate::{LinkedDataResource, LinkedDataSubject};
 
@@ -100,6 +102,48 @@ where
 	{
 		visitor.object(self)?;
 		visitor.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for BlankId
+where
+	V: BlankIdVocabularyMut,
+{
+	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: PredicateObjectsVisitor<V, I>,
+	{
+		visitor.object(self)?;
+		visitor.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for BlankIdBuf
+where
+	V: BlankIdVocabularyMut,
+{
+	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: PredicateObjectsVisitor<V, I>,
+	{
+		visitor.object(self)?;
+		visitor.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, T, B> LinkedDataPredicateObjects<V, I> for Id<T, B>
+where
+	T: LinkedDataPredicateObjects<V, I>,
+	B: LinkedDataPredicateObjects<V, I>,
+{
+	fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: PredicateObjectsVisitor<V, I>,
+	{
+		match self {
+			Self::Iri(i) => i.visit_objects(visitor),
+			Self::Blank(b) => b.visit_objects(visitor),
+		}
 	}
 }
 

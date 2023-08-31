@@ -134,6 +134,12 @@ trait Domain<V: Vocabulary, I: Interpretation> {
 	type Subject: Clone;
 	type Predicate: Clone;
 	type Object;
+	type ObjectRef<'a>: Copy
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -164,6 +170,30 @@ trait Domain<V: Vocabulary, I: Interpretation> {
 	) -> Result<Self::Subject, Error>;
 
 	fn object_as_subject<'a>(&self, object: &'a Self::Object) -> Result<&'a Self::Subject, Error>;
+
+	fn subject_as_object<'a>(
+		&self,
+		subject: &'a Self::Subject,
+	) -> Result<Self::ObjectRef<'a>, Error>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
+
+	fn object_as_ref<'a>(object: &'a Self::Object) -> Self::ObjectRef<'a>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
+
+	fn cloned_object_ref<'a>(object_ref: Self::ObjectRef<'a>) -> Self::Object
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 }
 
 type DomainQuad<V, I, D> = Quad<
@@ -193,6 +223,7 @@ where
 	type Subject = RdfId<V>;
 	type Predicate = V::Iri;
 	type Object = Term<RdfId<V>, V::Literal>;
+	type ObjectRef<'a> = Term<&'a RdfId<V>, &'a V::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -314,6 +345,39 @@ where
 			Term::Literal(_) => Err(Error::Subject),
 		}
 	}
+
+	fn subject_as_object<'a>(
+		&self,
+		subject: &'a Self::Subject,
+	) -> Result<Self::ObjectRef<'a>, Error>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		Ok(Term::Id(subject))
+	}
+
+	fn object_as_ref<'a>(object: &'a Self::Object) -> Self::ObjectRef<'a>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object.as_ref()
+	}
+
+	fn cloned_object_ref<'a>(object_ref: Self::ObjectRef<'a>) -> Self::Object
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object_ref.cloned()
+	}
 }
 
 struct InterpretationDomain;
@@ -335,6 +399,7 @@ where
 	type Subject = I::Resource;
 	type Predicate = I::Resource;
 	type Object = I::Resource;
+	type ObjectRef<'a> = &'a I::Resource where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -450,6 +515,39 @@ where
 
 	fn object_as_subject<'a>(&self, object: &'a Self::Object) -> Result<&'a Self::Subject, Error> {
 		Ok(object)
+	}
+
+	fn subject_as_object<'a>(
+		&self,
+		subject: &'a Self::Subject,
+	) -> Result<Self::ObjectRef<'a>, Error>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		Ok(subject)
+	}
+
+	fn object_as_ref<'a>(object: &'a Self::Object) -> Self::ObjectRef<'a>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object
+	}
+
+	fn cloned_object_ref<'a>(object_ref: Self::ObjectRef<'a>) -> Self::Object
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object_ref.clone()
 	}
 }
 
@@ -568,6 +666,13 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectOrObject<'a, 
 			Self::Object(o) => domain.object_as_subject(o),
 		}
 	}
+
+	fn into_object(self, domain: &D) -> Result<D::ObjectRef<'a>, Error> {
+		match self {
+			Self::Subject(s) => domain.subject_as_object(s),
+			Self::Object(o) => Ok(D::object_as_ref(o)),
+		}
+	}
 }
 
 impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
@@ -601,6 +706,31 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 		value.visit_objects(objects_serializer)
 	}
 
+	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<V, I>,
+		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
+	{
+		let object = self.subject.into_object(self.domain)?;
+
+		let i = predicate.interpretation(self.vocabulary, self.interpretation);
+		let term = self
+			.domain
+			.predicate(self.vocabulary, self.interpretation, i)?;
+
+		let subjects_serializer = ReversePredicateSerializer {
+			vocabulary: self.vocabulary,
+			interpretation: self.interpretation,
+			domain: self.domain,
+			result: self.result,
+			graph: self.graph,
+			object,
+			predicate: term,
+		};
+
+		subjects.visit_objects(subjects_serializer)
+	}
+
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<V, I>,
@@ -616,6 +746,27 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 		};
 
 		value.visit_graph(graph_serializer)
+	}
+
+	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
+	{
+		let i = value.interpretation(self.vocabulary, self.interpretation);
+		let subject = self
+			.domain
+			.subject(self.vocabulary, self.interpretation, i)?;
+
+		value.visit_subject(QuadPropertiesSerializer {
+			vocabulary: self.vocabulary,
+			interpretation: self.interpretation,
+			domain: self.domain,
+			graph: self.graph,
+			subject: SubjectOrObject::Subject(&subject),
+			result: self.result,
+		})?;
+
+		Ok(())
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -661,6 +812,55 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 			self.subject.clone(),
 			self.predicate.clone(),
 			term,
+			self.graph.cloned(),
+		));
+		Ok(())
+	}
+
+	fn end(self) -> Result<Self::Ok, Self::Error> {
+		Ok(())
+	}
+}
+
+struct ReversePredicateSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+	vocabulary: &'a mut V,
+	interpretation: &'a mut I,
+	domain: &'a mut D,
+	result: &'a mut Vec<DomainQuad<V, I, D>>,
+	graph: Option<&'a D::Subject>,
+	object: D::ObjectRef<'a>,
+	predicate: D::Predicate,
+}
+
+impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisitor<V, I>
+	for ReversePredicateSerializer<'a, V, I, D>
+{
+	type Ok = ();
+	type Error = Error;
+
+	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
+	{
+		let i = value.interpretation(self.vocabulary, self.interpretation);
+		let subject = self
+			.domain
+			.subject(self.vocabulary, self.interpretation, i)?;
+
+		let subject_serializer = QuadPropertiesSerializer {
+			vocabulary: self.vocabulary,
+			interpretation: self.interpretation,
+			domain: self.domain,
+			result: self.result,
+			graph: self.graph,
+			subject: SubjectOrObject::Subject(&subject),
+		};
+
+		value.visit_subject(subject_serializer)?;
+		self.result.push(Quad(
+			subject,
+			self.predicate.clone(),
+			D::cloned_object_ref(self.object),
 			self.graph.cloned(),
 		));
 		Ok(())

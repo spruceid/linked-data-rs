@@ -1,5 +1,5 @@
 use iref::{Iri, IriBuf};
-use rdf_types::{Interpretation, Vocabulary};
+use rdf_types::{BlankId, BlankIdBuf, Interpretation, Vocabulary};
 
 use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
 
@@ -39,6 +39,24 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for IriBuf {
 	}
 }
 
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlankId {
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		serializer.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlankIdBuf {
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		serializer.end()
+	}
+}
+
 pub trait SubjectVisitor<V: Vocabulary, I: Interpretation> {
 	type Ok;
 	type Error;
@@ -49,9 +67,19 @@ pub trait SubjectVisitor<V: Vocabulary, I: Interpretation> {
 		L: ?Sized + LinkedDataResource<V, I>,
 		T: ?Sized + LinkedDataPredicateObjects<V, I>;
 
+	/// Visit a reverse predicate of the graph.
+	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<V, I>,
+		T: ?Sized + LinkedDataPredicateObjects<V, I>;
+
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<V, I>;
+
+	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>;
 
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
@@ -70,11 +98,26 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 		S::predicate(self, predicate, objects)
 	}
 
+	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<V, I>,
+		T: ?Sized + LinkedDataPredicateObjects<V, I>,
+	{
+		S::reverse_predicate(self, predicate, subjects)
+	}
+
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<V, I>,
 	{
 		S::graph(self, value)
+	}
+
+	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
+	{
+		S::include(self, value)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
