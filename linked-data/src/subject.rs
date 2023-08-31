@@ -1,5 +1,5 @@
 use iref::{Iri, IriBuf};
-use rdf_types::{BlankId, BlankIdBuf, Interpretation, Vocabulary};
+use rdf_types::{BlankId, BlankIdBuf, Id, Interpretation, Vocabulary};
 
 use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
 
@@ -54,6 +54,22 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlankIdBuf {
 		S: SubjectVisitor<V, I>,
 	{
 		serializer.end()
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, T, B> LinkedDataSubject<V, I> for Id<T, B>
+where
+	T: LinkedDataSubject<V, I>,
+	B: LinkedDataSubject<V, I>,
+{
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		match self {
+			Self::Iri(i) => i.visit_subject(serializer),
+			Self::Blank(b) => b.visit_subject(serializer),
+		}
 	}
 }
 
