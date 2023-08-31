@@ -70,48 +70,56 @@ fn variant_compound_fields(
 		let span = field.span();
 		let field_attrs = read_field_attributes(field.attrs)?;
 
-		let field_access = match field.ident {
-			Some(id) => named_accessor(id),
-			None => unnamed_accessor(i as u32),
-		};
+		if !field_attrs.ignore {
+			let field_access = match field.ident {
+				Some(id) => named_accessor(id),
+				None => unnamed_accessor(i as u32),
+			};
 
-		let ty = field.ty;
+			let ty = field.ty;
 
-		if field_attrs.is_id {
-			id_field = Some((field_access, ty));
-			continue;
-		}
-
-		let field_ref = by_ref(field_access);
-		let visit_field = if field_attrs.flatten {
-			visit.bounds.push(syn::parse2(quote!(
-				#ty: ::linked_data::LinkedDataSubject<V, I>
-			)).unwrap());
-
-			quote! {
-				<#ty as ::linked_data::LinkedDataSubject<V, I>>::visit_subject(#field_ref, &mut visitor)?;
+			if field_attrs.is_id {
+				id_field = Some((field_access, ty));
+				continue;
 			}
-		} else {
-			match field_attrs.iri {
-				Some(compact_iri) => {
-					let iri = compact_iri.expand(&attrs.prefixes)?.into_string();
-					visit.vocabulary_bounds.iri_mut = true;
-					visit.bounds.push(syn::parse2(quote!(
-						#ty: ::linked_data::LinkedDataPredicateObjects<V, I>
-					)).unwrap());
 
-					quote! {
-						visitor.predicate(
-							::linked_data::iref::Iri::new(#iri).unwrap(),
-							#field_ref
-						)?;
-					}
+			let field_ref = by_ref(field_access);
+			let visit_field = if field_attrs.flatten {
+				visit.bounds.push(
+					syn::parse2(quote!(
+						#ty: ::linked_data::LinkedDataSubject<V_, I_>
+					))
+					.unwrap(),
+				);
+
+				quote! {
+					<#ty as ::linked_data::LinkedDataSubject<V_, I_>>::visit_subject(#field_ref, &mut visitor)?;
 				}
-				None => return Err(Error::UnknownFieldSerializationMethod(span)),
-			}
-		};
+			} else {
+				match field_attrs.iri {
+					Some(compact_iri) => {
+						let iri = compact_iri.expand(&attrs.prefixes)?.into_string();
+						visit.vocabulary_bounds.iri_mut = true;
+						visit.bounds.push(
+							syn::parse2(quote!(
+								#ty: ::linked_data::LinkedDataPredicateObjects<V_, I_>
+							))
+							.unwrap(),
+						);
 
-		visit_fields.push(visit_field)
+						quote! {
+							visitor.predicate(
+								::linked_data::iref::Iri::new(#iri).unwrap(),
+								#field_ref
+							)?;
+						}
+					}
+					None => return Err(Error::UnknownFieldSerializationMethod(span)),
+				}
+			};
+
+			visit_fields.push(visit_field)
+		}
 	}
 
 	visit.body = quote! {

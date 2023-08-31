@@ -61,6 +61,7 @@ impl<'a, T> Borrow<T> for CowRef<'a, T> {
 }
 
 impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
+	#[allow(clippy::type_complexity)]
 	pub fn into_term(
 		self,
 	) -> Term<Id<CowRef<'a, V::Iri>, CowRef<'a, V::BlankId>>, CowRdfLiteral<'a, V>> {

@@ -1,7 +1,7 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 
-use crate::{FromLinkedDataError, Interpret, LinkedDataGraph, LinkedDataPredicateObjects};
+use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
 
 /// Serialize a Linked-Data node.
 pub trait LinkedDataSubject<V: Vocabulary = (), I: Interpretation = ()> {
@@ -46,7 +46,7 @@ pub trait SubjectVisitor<V: Vocabulary, I: Interpretation> {
 	/// Visit a predicate of the graph.
 	fn predicate<L, T>(&mut self, predicate: &L, objects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + Interpret<V, I>,
+		L: ?Sized + LinkedDataResource<V, I>,
 		T: ?Sized + LinkedDataPredicateObjects<V, I>;
 
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -64,7 +64,7 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 
 	fn predicate<L, T>(&mut self, predicate: &L, objects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + Interpret<V, I>,
+		L: ?Sized + LinkedDataResource<V, I>,
 		T: ?Sized + LinkedDataPredicateObjects<V, I>,
 	{
 		S::predicate(self, predicate, objects)

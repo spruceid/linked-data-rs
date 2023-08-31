@@ -1,4 +1,4 @@
-use linked_data::{to_quads, Interpret, LinkedData};
+use linked_data::{to_quads, LinkedData, LinkedDataResource};
 use rdf_types::{generator, RdfDisplay};
 
 #[derive(LinkedData)]
@@ -36,7 +36,7 @@ enum Ids {
 
 fn main() {
 	let a = Subject::Name("A".to_string());
-	println!("{:?}", a.interpret(&mut (), &mut ()));
+	println!("{:?}", a.interpretation(&mut (), &mut ()));
 
 	println!();
 	let b = SubjectCompound::Name("B".to_string());
@@ -58,4 +58,8 @@ fn main() {
 	for quad in quads {
 		println!("{} .", quad.rdf_display())
 	}
+
+	println!();
+	let e = Ids::A;
+	println!("{:?}", e.interpretation(&mut (), &mut ()));
 }

@@ -79,8 +79,8 @@ impl<'a, V: Vocabulary, I: Interpretation> ResourceInterpretation<'a, V, I> {
 }
 
 /// Type that can have an interpretation bound to the given lifetime.
-pub trait InterpretRef<'a, V: Vocabulary, I: Interpretation> {
-	fn interpret_ref(
+pub trait LinkedDataResourceRef<'a, V: Vocabulary = (), I: Interpretation = ()> {
+	fn interpretation_ref(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
@@ -88,9 +88,12 @@ pub trait InterpretRef<'a, V: Vocabulary, I: Interpretation> {
 }
 
 /// Type that can have an interpretation.
-pub trait Interpret<V: Vocabulary, I: Interpretation> {
-	fn interpret(&self, vocabulary: &mut V, interpretation: &mut I)
-		-> ResourceInterpretation<V, I>;
+pub trait LinkedDataResource<V: Vocabulary = (), I: Interpretation = ()> {
+	fn interpretation(
+		&self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+	) -> ResourceInterpretation<V, I>;
 
 	fn lexical_representation<'a>(
 		&'a self,
@@ -103,28 +106,32 @@ pub trait Interpret<V: Vocabulary, I: Interpretation> {
 			+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
 			+ ReverseLiteralInterpretation<Literal = V::Literal>,
 	{
-		self.interpret(vocabulary, interpretation)
+		self.interpretation(vocabulary, interpretation)
 			.into_lexical_representation(vocabulary, interpretation)
 	}
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + Interpret<V, I>> Interpret<V, I> for &'a T {
-	fn interpret(
+impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataResource<V, I>>
+	LinkedDataResource<V, I> for &'a T
+{
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
-		T::interpret(self, vocabulary, interpretation)
+		T::interpretation(self, vocabulary, interpretation)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: ?Sized + Interpret<V, I>> Interpret<V, I> for Box<T> {
-	fn interpret(
+impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataResource<V, I>>
+	LinkedDataResource<V, I> for Box<T>
+{
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
-		T::interpret(self, vocabulary, interpretation)
+		T::interpretation(self, vocabulary, interpretation)
 	}
 }
 
@@ -134,8 +141,8 @@ impl<V: Vocabulary, I: Interpretation, T: ?Sized + Interpret<V, I>> Interpret<V,
 /// node identifier.
 pub struct Anonymous;
 
-impl<V: Vocabulary, I: Interpretation> Interpret<V, I> for Anonymous {
-	fn interpret(
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for Anonymous {
+	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
@@ -144,8 +151,8 @@ impl<V: Vocabulary, I: Interpretation> Interpret<V, I> for Anonymous {
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> Interpret<V, I> for Iri {
-	fn interpret(
+impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for Iri {
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
@@ -156,8 +163,8 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> Interpret<V, I> for Ir
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> Interpret<V, I> for IriBuf {
-	fn interpret(
+impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for IriBuf {
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
@@ -168,8 +175,8 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> Interpret<V, I> for Ir
 	}
 }
 
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I> for BlankId {
-	fn interpret(
+impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for BlankId {
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
@@ -180,8 +187,10 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I> fo
 	}
 }
 
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I> for BlankIdBuf {
-	fn interpret(
+impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource<V, I>
+	for BlankIdBuf
+{
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
@@ -192,44 +201,46 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I> fo
 	}
 }
 
-impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I>
-	for Id<&'a Iri, &'a BlankId>
+impl<'a, V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
+	LinkedDataResource<V, I> for Id<&'a Iri, &'a BlankId>
 {
-	fn interpret(
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
 		match self {
-			Self::Iri(i) => i.interpret(vocabulary, interpretation),
-			Self::Blank(b) => b.interpret(vocabulary, interpretation),
+			Self::Iri(i) => i.interpretation(vocabulary, interpretation),
+			Self::Blank(b) => b.interpretation(vocabulary, interpretation),
 		}
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation> Interpret<V, I>
-	for Id<IriBuf, BlankIdBuf>
+impl<V: Vocabulary + IriVocabularyMut + BlankIdVocabularyMut, I: Interpretation>
+	LinkedDataResource<V, I> for Id<IriBuf, BlankIdBuf>
 {
-	fn interpret(
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
 		match self {
-			Self::Iri(i) => i.interpret(vocabulary, interpretation),
-			Self::Blank(b) => b.interpret(vocabulary, interpretation),
+			Self::Iri(i) => i.interpretation(vocabulary, interpretation),
+			Self::Blank(b) => b.interpretation(vocabulary, interpretation),
 		}
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: Interpret<V, I>> Interpret<V, I> for Option<T> {
-	fn interpret(
+impl<V: Vocabulary, I: Interpretation, T: LinkedDataResource<V, I>> LinkedDataResource<V, I>
+	for Option<T>
+{
+	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
 		match self {
-			Some(t) => t.interpret(vocabulary, interpretation),
+			Some(t) => t.interpretation(vocabulary, interpretation),
 			None => ResourceInterpretation::Uninterpreted(None),
 		}
 	}

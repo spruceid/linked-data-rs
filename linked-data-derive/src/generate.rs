@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use iref::{InvalidIri, IriBuf, Iri};
+use iref::{InvalidIri, Iri, IriBuf};
+use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use static_iref::iri;
-use proc_macro2::{Span, TokenStream, TokenTree};
 
-use syn::{spanned::Spanned, punctuated::Punctuated};
+use syn::{punctuated::Punctuated, spanned::Spanned};
 
 use self::ser::VocabularyBounds;
 
@@ -98,6 +98,7 @@ pub struct TypeAttributes {
 }
 
 pub struct FieldAttributes {
+	ignore: bool,
 	iri: Option<CompactIri>,
 	flatten: bool,
 	is_id: bool,
@@ -110,39 +111,45 @@ pub struct VariantAttributes {
 fn extend_generics(
 	generics: &syn::Generics,
 	vocabulary_bounds: VocabularyBounds,
-	mut bounds: Vec<syn::WherePredicate>
+	mut bounds: Vec<syn::WherePredicate>,
 ) -> syn::Generics {
 	let mut result = generics.clone();
 
 	result.params.push(syn::GenericParam::Type(syn::TypeParam {
 		attrs: Vec::new(),
-		ident: format_ident!("V"),
+		ident: format_ident!("V_"),
 		colon_token: None,
-        bounds: Punctuated::new(),
-        eq_token: None,
-        default: None,
+		bounds: Punctuated::new(),
+		eq_token: None,
+		default: None,
 	}));
 
 	result.params.push(syn::GenericParam::Type(syn::TypeParam {
 		attrs: Vec::new(),
-		ident: format_ident!("I"),
+		ident: format_ident!("I_"),
 		colon_token: None,
-        bounds: Punctuated::new(),
-        eq_token: None,
-        default: None,
+		bounds: Punctuated::new(),
+		eq_token: None,
+		default: None,
 	}));
 
-	bounds.push(syn::parse2(quote! {
-		V: #vocabulary_bounds
-	}).unwrap());
+	bounds.push(
+		syn::parse2(quote! {
+			V_: #vocabulary_bounds
+		})
+		.unwrap(),
+	);
 
-	bounds.push(syn::parse2(quote! {
-		I: ::linked_data::rdf_types::Interpretation
-	}).unwrap());
+	bounds.push(
+		syn::parse2(quote! {
+			I_: ::linked_data::rdf_types::Interpretation
+		})
+		.unwrap(),
+	);
 
 	let where_clause = result.where_clause.get_or_insert(syn::WhereClause {
 		where_token: Default::default(),
-		predicates: Punctuated::new()
+		predicates: Punctuated::new(),
 	});
 
 	where_clause.predicates.extend(bounds);
@@ -312,6 +319,7 @@ fn parse_prefix_binding(tokens: TokenStream, span: Span) -> Result<(String, Stri
 }
 
 fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttributes, Error> {
+	let mut ignore = false;
 	let mut iri = None;
 	let mut flatten = false;
 	let mut is_id = false;
@@ -324,7 +332,9 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
 					let mut tokens = list.tokens.into_iter();
 					match tokens.next() {
 						Some(TokenTree::Ident(id)) => {
-							if id == "flatten" {
+							if id == "ignore" {
+								ignore = true
+							} else if id == "flatten" {
 								flatten = true
 							} else if id == "id" {
 								is_id = true
@@ -379,6 +389,7 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
 	}
 
 	Ok(FieldAttributes {
+		ignore,
 		iri,
 		flatten,
 		is_id,
@@ -410,46 +421,37 @@ fn read_variant_attributes(attributes: Vec<syn::Attribute>) -> Result<VariantAtt
 }
 
 enum VariantAttribute {
-	Iri(CompactIri)
+	Iri(CompactIri),
 }
 
 fn read_variant_attribute(tokens: TokenStream, span: Span) -> Result<VariantAttribute, Error> {
 	let mut tokens = tokens.into_iter();
 	match tokens.next() {
-		Some(TokenTree::Group(g)) => {
-			read_variant_attribute(g.stream(), span)
-		}
+		Some(TokenTree::Group(g)) => read_variant_attribute(g.stream(), span),
 		Some(TokenTree::Literal(l)) => {
 			let l = syn::Lit::new(l);
 			match l {
 				syn::Lit::Str(l) => match IriBuf::new(l.value()) {
-					Ok(value) => {
-						Ok(VariantAttribute::Iri(CompactIri(value, l.span())))
-					}
-					Err(_) => {
-						Err(Error::InvalidAttribute(
-							AttributeError::InvalidCompactIri,
-							l.span(),
-						))
-					}
-				},
-				l => {
-					Err(Error::InvalidAttribute(
-						AttributeError::ExpectedString,
+					Ok(value) => Ok(VariantAttribute::Iri(CompactIri(value, l.span()))),
+					Err(_) => Err(Error::InvalidAttribute(
+						AttributeError::InvalidCompactIri,
 						l.span(),
-					))
-				}
+					)),
+				},
+				l => Err(Error::InvalidAttribute(
+					AttributeError::ExpectedString,
+					l.span(),
+				)),
 			}
 		}
-		Some(TokenTree::Ident(id)) if id == "type" => {
-			Ok(VariantAttribute::Iri(CompactIri(RDF_TYPE.to_owned(), id.span())))
-		}
-		Some(token) => {
-			Err(Error::InvalidAttribute(
-				AttributeError::UnexpectedToken,
-				token.span(),
-			))
-		}
+		Some(TokenTree::Ident(id)) if id == "type" => Ok(VariantAttribute::Iri(CompactIri(
+			RDF_TYPE.to_owned(),
+			id.span(),
+		))),
+		Some(token) => Err(Error::InvalidAttribute(
+			AttributeError::UnexpectedToken,
+			token.span(),
+		)),
 		None => Err(Error::InvalidAttribute(AttributeError::Empty, span)),
 	}
 }

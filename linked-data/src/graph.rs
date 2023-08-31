@@ -1,7 +1,7 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 
-use crate::{Interpret, LinkedDataSubject};
+use crate::{LinkedDataResource, LinkedDataSubject};
 
 // use crate::SerializeSubject;
 
@@ -47,7 +47,7 @@ pub trait GraphVisitor<V: Vocabulary, I: Interpretation> {
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + Interpret<V, I> + LinkedDataSubject<V, I>;
+		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>;
 
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
@@ -58,7 +58,7 @@ impl<'a, V: Vocabulary, I: Interpretation, S: GraphVisitor<V, I>> GraphVisitor<V
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + Interpret<V, I> + LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
 	{
 		S::subject(self, value)
 	}

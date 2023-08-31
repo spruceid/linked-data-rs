@@ -7,7 +7,7 @@ use rdf_types::{
 };
 
 use crate::{
-	CowRdfTerm, GraphVisitor, Interpret, InterpretedQuad, LinkedData, LinkedDataGraph,
+	CowRdfTerm, GraphVisitor, InterpretedQuad, LinkedData, LinkedDataGraph, LinkedDataResource,
 	LinkedDataSubject, PredicateObjectsVisitor, RdfId, RdfLiteralType, RdfLiteralValue, RdfQuad,
 	ResourceInterpretation, SubjectVisitor, Visitor,
 };
@@ -42,7 +42,7 @@ pub fn to_interpreted_subject_quads<V: Vocabulary, I: Interpretation>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&I::Resource>,
-	value: &(impl LinkedDataSubject<V, I> + Interpret<V, I>),
+	value: &(impl LinkedDataSubject<V, I> + LinkedDataResource<V, I>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), Error>
 where
 	I: InterpretationMut
@@ -59,7 +59,7 @@ where
 {
 	let mut result = Vec::new();
 
-	let subject = match value.interpret(vocabulary, interpretation) {
+	let subject = match value.interpretation(vocabulary, interpretation) {
 		ResourceInterpretation::Interpreted(r) => r.clone(),
 		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(),
 	};
@@ -484,9 +484,9 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
 
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + Interpret<V, I> + crate::LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataGraph<V, I>,
 	{
-		let i = value.interpret(self.vocabulary, self.interpretation);
+		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let graph = self.domain.graph(self.vocabulary, self.interpretation, i)?;
 
 		let graph_serializer = QuadGraphSerializer {
@@ -521,9 +521,9 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> GraphVisitor<V, I>
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + Interpret<V, I> + crate::LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
 	{
-		let i = value.interpret(self.vocabulary, self.interpretation);
+		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.subject(self.vocabulary, self.interpretation, i)?;
@@ -578,12 +578,12 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 
 	fn predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + Interpret<V, I>,
+		L: ?Sized + LinkedDataResource<V, I>,
 		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
 	{
 		let subject = self.subject.into_subject(self.domain)?;
 
-		let i = predicate.interpret(self.vocabulary, self.interpretation);
+		let i = predicate.interpretation(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.predicate(self.vocabulary, self.interpretation, i)?;
@@ -641,9 +641,9 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 
 	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + Interpret<V, I> + crate::LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
 	{
-		let i = value.interpret(self.vocabulary, self.interpretation);
+		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let term = self
 			.domain
 			.object(self.vocabulary, self.interpretation, i)?;

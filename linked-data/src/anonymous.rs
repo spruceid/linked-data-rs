@@ -2,7 +2,7 @@ use iref::Iri;
 use rdf_types::{Interpretation, IriVocabularyMut, Vocabulary};
 
 use crate::{
-	GraphVisitor, Interpret, LinkedData, LinkedDataGraph, LinkedDataPredicateObjects,
+	GraphVisitor, LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource,
 	LinkedDataSubject, PredicateObjectsVisitor, ResourceInterpretation, SubjectVisitor, Visitor,
 };
 
@@ -14,8 +14,8 @@ impl<'a, T> AnonymousBinding<'a, T> {
 	}
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T> Interpret<V, I> for AnonymousBinding<'a, T> {
-	fn interpret(
+impl<'a, V: Vocabulary, I: Interpretation, T> LinkedDataResource<V, I> for AnonymousBinding<'a, T> {
+	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,

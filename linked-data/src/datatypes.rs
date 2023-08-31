@@ -1,18 +1,18 @@
 use rdf_types::{Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary};
 
 use crate::{
-	CowRdfTerm, Interpret, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
-	RdfLiteral, RdfLiteralRef, ResourceInterpretation,
+	CowRdfTerm, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
+	PredicateObjectsVisitor, RdfLiteral, RdfLiteralRef, ResourceInterpretation,
 };
 
 macro_rules! datatype {
 	($($ty:ty : $variant:ident),*) => {
 		$(
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for $ty
 			where
 				V::Value: From<String>
 			{
-				fn interpret(
+				fn interpretation(
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
@@ -54,11 +54,11 @@ macro_rules! datatype {
 macro_rules! unsized_datatype {
 	($($ty:ty : $variant:ident),*) => {
 		$(
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> Interpret<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for $ty
 			where
 				V::Value: From<String>
 			{
-				fn interpret(
+				fn interpretation(
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
