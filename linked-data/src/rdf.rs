@@ -163,6 +163,26 @@ pub enum RdfLiteral<V: IriVocabulary + LanguageTagVocabulary, M = ()> {
 }
 
 impl<V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteral<V, M> {
+	pub fn into_lexical(self, vocabulary: &V) -> rdf_types::Literal {
+		match self {
+			Self::Any(s, literal::Type::Any(ty)) => rdf_types::Literal::new(
+				s.to_owned(),
+				literal::Type::Any(vocabulary.owned_iri(ty).ok().unwrap()),
+			),
+			Self::Any(s, literal::Type::LangString(lang)) => rdf_types::Literal::new(
+				s.to_owned(),
+				literal::Type::LangString(vocabulary.owned_language_tag(lang).ok().unwrap()),
+			),
+			Self::Xsd(value) => {
+				let ty = value.type_().iri().to_owned();
+				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
+			}
+			Self::Json(value) => {
+				rdf_types::Literal::new(value.to_string(), literal::Type::Any(RDF_JSON.to_owned()))
+			}
+		}
+	}
+
 	pub fn as_literal_ref(&self) -> RdfLiteralRef<V, M> {
 		match self {
 			Self::Any(value, ty) => {
@@ -234,6 +254,26 @@ pub enum RdfLiteralRef<'a, V: IriVocabulary + LanguageTagVocabulary, M = ()> {
 }
 
 impl<'a, V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteralRef<'a, V, M> {
+	pub fn into_lexical(self, vocabulary: &V) -> rdf_types::Literal {
+		match self {
+			Self::Any(s, literal::Type::Any(ty)) => rdf_types::Literal::new(
+				s.to_owned(),
+				literal::Type::Any(vocabulary.iri(ty).unwrap().to_owned()),
+			),
+			Self::Any(s, literal::Type::LangString(lang)) => rdf_types::Literal::new(
+				s.to_owned(),
+				literal::Type::LangString(vocabulary.language_tag(lang).unwrap().cloned()),
+			),
+			Self::Xsd(value) => {
+				let ty = value.type_().iri().to_owned();
+				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
+			}
+			Self::Json(value) => {
+				rdf_types::Literal::new(value.to_string(), literal::Type::Any(RDF_JSON.to_owned()))
+			}
+		}
+	}
+
 	pub fn into_owned(self) -> RdfLiteral<V, M>
 	where
 		V::Iri: Clone,

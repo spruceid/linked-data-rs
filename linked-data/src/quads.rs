@@ -1,9 +1,11 @@
 use educe::Educe;
+use iref::IriBuf;
 use rdf_types::{
 	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankIdInterpretationMut, Generator, Id, InsertIntoVocabulary, Interpretation,
-	InterpretationMut, IriInterpretationMut, IriVocabularyMut, LiteralInterpretationMut,
-	LiteralVocabularyMut, Quad, ReverseLiteralInterpretation, Term, Vocabulary,
+	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id, InsertIntoVocabulary,
+	Interpretation, InterpretationMut, IriInterpretationMut, IriVocabularyMut,
+	LiteralInterpretationMut, LiteralVocabularyMut, Quad, ReverseLiteralInterpretation, Term,
+	Vocabulary,
 };
 
 use crate::{
@@ -16,7 +18,7 @@ pub fn to_interpreted_quads<V: Vocabulary, I: Interpretation>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<V, I>,
-) -> Result<Vec<InterpretedQuad<I>>, Error>
+) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
 	I: InterpretationMut
 		+ IriInterpretationMut<V::Iri>
@@ -43,7 +45,7 @@ pub fn to_interpreted_subject_quads<V: Vocabulary, I: Interpretation>(
 	interpretation: &mut I,
 	graph: Option<&I::Resource>,
 	value: &(impl LinkedDataSubject<V, I> + LinkedDataResource<V, I>),
-) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), Error>
+) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
 	I: InterpretationMut
 		+ IriInterpretationMut<V::Iri>
@@ -76,12 +78,41 @@ where
 	Ok((subject, result))
 }
 
+pub fn to_lexical_quads_with<V: Vocabulary, I: Interpretation>(
+	vocabulary: &mut V,
+	interpretation: &mut I,
+	generator: impl Generator<()>,
+	value: &impl LinkedData<V, I>,
+) -> Result<Vec<Quad>, IntoQuadsError>
+where
+	I: ReverseIriInterpretation<Iri = V::Iri>
+		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
+		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+{
+	let mut domain = LexicalDomain { generator };
+
+	value.visit(QuadSerializer {
+		vocabulary,
+		interpretation,
+		domain: &mut domain,
+		result: Vec::new(),
+	})
+}
+
+pub fn to_lexical_quads(
+	generator: impl Generator<()>,
+	value: &impl LinkedData,
+) -> Result<Vec<Quad>, IntoQuadsError> {
+	to_lexical_quads_with(&mut (), &mut (), generator, value)
+}
+
 pub fn to_quads_with<V: Vocabulary, I: Interpretation>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	generator: impl Generator<V>,
 	value: &impl LinkedData<V, I>,
-) -> Result<Vec<RdfQuad<V>>, Error>
+) -> Result<Vec<RdfQuad<V>>, IntoQuadsError>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
@@ -107,7 +138,7 @@ where
 pub fn to_quads(
 	generator: impl Generator<()>,
 	value: &impl LinkedData,
-) -> Result<Vec<Quad>, Error> {
+) -> Result<Vec<Quad>, IntoQuadsError> {
 	let mut domain = VocabularyDomain { generator };
 
 	value.visit(QuadSerializer {
@@ -119,7 +150,7 @@ pub fn to_quads(
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum IntoQuadsError {
 	#[error("invalid graph label")]
 	Graph,
 
@@ -146,35 +177,38 @@ trait Domain<V: Vocabulary, I: Interpretation> {
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error>;
+	) -> Result<Self::Subject, IntoQuadsError>;
 
 	fn predicate(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Predicate, Error>;
+	) -> Result<Self::Predicate, IntoQuadsError>;
 
 	fn object(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Object, Error>;
+	) -> Result<Self::Object, IntoQuadsError>;
 
 	fn graph(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error>;
+	) -> Result<Self::Subject, IntoQuadsError>;
 
-	fn object_as_subject<'a>(&self, object: &'a Self::Object) -> Result<&'a Self::Subject, Error>;
+	fn object_as_subject<'a>(
+		&self,
+		object: &'a Self::Object,
+	) -> Result<&'a Self::Subject, IntoQuadsError>;
 
 	fn subject_as_object<'a>(
 		&self,
 		subject: &'a Self::Subject,
-	) -> Result<Self::ObjectRef<'a>, Error>
+	) -> Result<Self::ObjectRef<'a>, IntoQuadsError>
 	where
 		V::Iri: 'a,
 		V::BlankId: 'a,
@@ -230,7 +264,7 @@ where
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error> {
+	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
 				if let Some(iri) = interpretation.iris_of(r).next() {
@@ -247,7 +281,7 @@ where
 				.map(|t| t.into_owned())
 				.unwrap_or_else(|| Term::Id(self.generator.next(vocabulary)))
 				.into_id()
-				.ok_or(Error::Subject),
+				.ok_or(IntoQuadsError::Subject),
 		}
 	}
 
@@ -256,19 +290,19 @@ where
 		_vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Predicate, Error> {
+	) -> Result<Self::Predicate, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
 				if let Some(iri) = interpretation.iris_of(r).next() {
 					return Ok(iri.clone());
 				}
 
-				Err(Error::Predicate)
+				Err(IntoQuadsError::Predicate)
 			}
 			ResourceInterpretation::Uninterpreted(u) => match u {
 				Some(CowRdfTerm::Owned(Term::Id(Id::Iri(iri)))) => Ok(iri),
 				Some(CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri)))) => Ok(iri.clone()),
-				_ => Err(Error::Predicate),
+				_ => Err(IntoQuadsError::Predicate),
 			},
 		}
 	}
@@ -278,7 +312,7 @@ where
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Object, Error> {
+	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
 				if let Some(iri) = interpretation.iris_of(r).next() {
@@ -318,7 +352,7 @@ where
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error> {
+	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
 				if let Some(iri) = interpretation.iris_of(r).next() {
@@ -335,21 +369,24 @@ where
 				.map(CowRdfTerm::into_owned)
 				.unwrap_or_else(|| Term::Id(self.generator.next(vocabulary)))
 				.into_id()
-				.ok_or(Error::Graph),
+				.ok_or(IntoQuadsError::Graph),
 		}
 	}
 
-	fn object_as_subject<'a>(&self, object: &'a Self::Object) -> Result<&'a Self::Subject, Error> {
+	fn object_as_subject<'a>(
+		&self,
+		object: &'a Self::Object,
+	) -> Result<&'a Self::Subject, IntoQuadsError> {
 		match object {
 			Term::Id(id) => Ok(id),
-			Term::Literal(_) => Err(Error::Subject),
+			Term::Literal(_) => Err(IntoQuadsError::Subject),
 		}
 	}
 
 	fn subject_as_object<'a>(
 		&self,
 		subject: &'a Self::Subject,
-	) -> Result<Self::ObjectRef<'a>, Error>
+	) -> Result<Self::ObjectRef<'a>, IntoQuadsError>
 	where
 		V::Iri: 'a,
 		V::BlankId: 'a,
@@ -406,7 +443,7 @@ where
 		_vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error> {
+	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
 			ResourceInterpretation::Uninterpreted(u) => match u {
@@ -422,8 +459,8 @@ where
 				Some(CowRdfTerm::Borrowed(Term::Id(Id::Blank(b)))) => {
 					Ok(interpretation.interpret_blank_id(b.clone()))
 				}
-				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(Error::Subject),
-				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(Error::Subject),
+				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(IntoQuadsError::Subject),
+				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(IntoQuadsError::Subject),
 				None => Ok(interpretation.new_resource()),
 			},
 		}
@@ -434,7 +471,7 @@ where
 		_vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Predicate, Error> {
+	) -> Result<Self::Predicate, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
 			ResourceInterpretation::Uninterpreted(u) => match u {
@@ -444,7 +481,7 @@ where
 				Some(CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri)))) => {
 					Ok(interpretation.interpret_iri(iri.clone()))
 				}
-				_ => Err(Error::Predicate),
+				_ => Err(IntoQuadsError::Predicate),
 			},
 		}
 	}
@@ -454,7 +491,7 @@ where
 		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Object, Error> {
+	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
 			ResourceInterpretation::Uninterpreted(u) => match u {
@@ -490,7 +527,7 @@ where
 		_vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
-	) -> Result<Self::Subject, Error> {
+	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
 			ResourceInterpretation::Uninterpreted(u) => match u {
@@ -506,21 +543,24 @@ where
 				Some(CowRdfTerm::Borrowed(Term::Id(Id::Blank(b)))) => {
 					Ok(interpretation.interpret_blank_id(b.clone()))
 				}
-				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(Error::Graph),
-				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(Error::Graph),
+				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(IntoQuadsError::Graph),
+				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(IntoQuadsError::Graph),
 				None => Ok(interpretation.new_resource()),
 			},
 		}
 	}
 
-	fn object_as_subject<'a>(&self, object: &'a Self::Object) -> Result<&'a Self::Subject, Error> {
+	fn object_as_subject<'a>(
+		&self,
+		object: &'a Self::Object,
+	) -> Result<&'a Self::Subject, IntoQuadsError> {
 		Ok(object)
 	}
 
 	fn subject_as_object<'a>(
 		&self,
 		subject: &'a Self::Subject,
-	) -> Result<Self::ObjectRef<'a>, Error>
+	) -> Result<Self::ObjectRef<'a>, IntoQuadsError>
 	where
 		V::Iri: 'a,
 		V::BlankId: 'a,
@@ -551,6 +591,220 @@ where
 	}
 }
 
+struct LexicalDomain<G> {
+	generator: G,
+}
+
+fn lexical_term<V: Vocabulary>(vocabulary: &V, term: CowRdfTerm<V>) -> Term {
+	match term {
+		CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri))) => {
+			Term::Id(Id::Iri(vocabulary.iri(iri).unwrap().to_owned()))
+		}
+		CowRdfTerm::Owned(Term::Id(Id::Iri(iri))) => {
+			Term::Id(Id::Iri(vocabulary.owned_iri(iri).ok().unwrap()))
+		}
+		CowRdfTerm::Borrowed(Term::Id(Id::Blank(blank_id))) => {
+			Term::Id(Id::Blank(vocabulary.blank_id(blank_id).unwrap().to_owned()))
+		}
+		CowRdfTerm::Owned(Term::Id(Id::Blank(blank_id))) => {
+			Term::Id(Id::Blank(vocabulary.owned_blank_id(blank_id).ok().unwrap()))
+		}
+		CowRdfTerm::Borrowed(Term::Literal(lit)) => Term::Literal(lit.into_lexical(vocabulary)),
+		CowRdfTerm::Owned(Term::Literal(lit)) => Term::Literal(lit.into_lexical(vocabulary)),
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, G: Generator<()>> Domain<V, I> for LexicalDomain<G>
+where
+	I: ReverseIriInterpretation<Iri = V::Iri>
+		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
+		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+{
+	type Subject = Id;
+	type Predicate = IriBuf;
+	type Object = Term;
+	type ObjectRef<'a> = Term<&'a Id, &'a rdf_types::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+
+	fn subject(
+		&mut self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: ResourceInterpretation<V, I>,
+	) -> Result<Self::Subject, IntoQuadsError> {
+		match value {
+			ResourceInterpretation::Interpreted(r) => {
+				if let Some(iri) = interpretation.iris_of(r).next() {
+					let iri = vocabulary.iri(iri).unwrap();
+					return Ok(Id::Iri(iri.to_owned()));
+				}
+
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
+					let blank_id = vocabulary.blank_id(blank_id).unwrap();
+					return Ok(Id::Blank(blank_id.to_owned()));
+				}
+
+				Ok(self.generator.next(&mut ()))
+			}
+			ResourceInterpretation::Uninterpreted(u) => u
+				.map(|t| lexical_term(vocabulary, t))
+				.unwrap_or_else(|| Term::Id(self.generator.next(&mut ())))
+				.into_id()
+				.ok_or(IntoQuadsError::Subject),
+		}
+	}
+
+	fn predicate(
+		&mut self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: ResourceInterpretation<V, I>,
+	) -> Result<Self::Predicate, IntoQuadsError> {
+		match value {
+			ResourceInterpretation::Interpreted(r) => {
+				if let Some(iri) = interpretation.iris_of(r).next() {
+					let iri = vocabulary.iri(iri).unwrap();
+					return Ok(iri.to_owned());
+				}
+
+				Err(IntoQuadsError::Predicate)
+			}
+			ResourceInterpretation::Uninterpreted(u) => match u {
+				Some(CowRdfTerm::Owned(Term::Id(Id::Iri(iri)))) => {
+					Ok(vocabulary.owned_iri(iri).ok().unwrap())
+				}
+				Some(CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri)))) => {
+					Ok(vocabulary.iri(iri).unwrap().to_owned())
+				}
+				_ => Err(IntoQuadsError::Predicate),
+			},
+		}
+	}
+
+	fn object(
+		&mut self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: ResourceInterpretation<V, I>,
+	) -> Result<Self::Object, IntoQuadsError> {
+		match value {
+			ResourceInterpretation::Interpreted(r) => {
+				if let Some(iri) = interpretation.iris_of(r).next() {
+					let iri = vocabulary.iri(iri).unwrap();
+					return Ok(Term::Id(Id::Iri(iri.to_owned())));
+				}
+
+				if let Some(lit) = interpretation.literals_of(r).next() {
+					return Ok(Term::Literal(lit.exported_from_vocabulary(vocabulary)));
+				}
+
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
+					let blank_id = vocabulary.blank_id(blank_id).unwrap();
+					return Ok(Term::Id(Id::Blank(blank_id.to_owned())));
+				}
+
+				Ok(Term::Id(self.generator.next(&mut ())))
+			}
+			ResourceInterpretation::Uninterpreted(u) => {
+				let term = match u {
+					Some(CowRdfTerm::Owned(Term::Id(Id::Iri(iri)))) => {
+						Term::Id(Id::Iri(vocabulary.owned_iri(iri).ok().unwrap()))
+					}
+					Some(CowRdfTerm::Borrowed(Term::Id(Id::Iri(iri)))) => {
+						Term::Id(Id::Iri(vocabulary.iri(iri).unwrap().to_owned()))
+					}
+					Some(CowRdfTerm::Owned(Term::Id(Id::Blank(blank_id)))) => {
+						Term::Id(Id::Blank(vocabulary.owned_blank_id(blank_id).ok().unwrap()))
+					}
+					Some(CowRdfTerm::Borrowed(Term::Id(Id::Blank(blank_id)))) => {
+						Term::Id(Id::Blank(vocabulary.blank_id(blank_id).unwrap().to_owned()))
+					}
+					Some(CowRdfTerm::Owned(Term::Literal(lit))) => {
+						Term::Literal(lit.into_lexical(vocabulary))
+					}
+					Some(CowRdfTerm::Borrowed(Term::Literal(lit))) => {
+						Term::Literal(lit.into_lexical(vocabulary))
+					}
+					None => Term::Id(self.generator.next(&mut ())),
+				};
+
+				Ok(term)
+			}
+		}
+	}
+
+	fn graph(
+		&mut self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+		value: ResourceInterpretation<V, I>,
+	) -> Result<Self::Subject, IntoQuadsError> {
+		match value {
+			ResourceInterpretation::Interpreted(r) => {
+				if let Some(iri) = interpretation.iris_of(r).next() {
+					let iri = vocabulary.iri(iri).unwrap();
+					return Ok(Id::Iri(iri.to_owned()));
+				}
+
+				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
+					let blank_id = vocabulary.blank_id(blank_id).unwrap();
+					return Ok(Id::Blank(blank_id.to_owned()));
+				}
+
+				Ok(self.generator.next(&mut ()))
+			}
+			ResourceInterpretation::Uninterpreted(u) => u
+				.map(|t| lexical_term(vocabulary, t))
+				.unwrap_or_else(|| Term::Id(self.generator.next(&mut ())))
+				.into_id()
+				.ok_or(IntoQuadsError::Graph),
+		}
+	}
+
+	fn object_as_subject<'a>(
+		&self,
+		object: &'a Self::Object,
+	) -> Result<&'a Self::Subject, IntoQuadsError> {
+		match object {
+			Term::Id(id) => Ok(id),
+			Term::Literal(_) => Err(IntoQuadsError::Subject),
+		}
+	}
+
+	fn subject_as_object<'a>(
+		&self,
+		subject: &'a Self::Subject,
+	) -> Result<Self::ObjectRef<'a>, IntoQuadsError>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		Ok(Term::Id(subject))
+	}
+
+	fn object_as_ref<'a>(object: &'a Self::Object) -> Self::ObjectRef<'a>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object.as_ref()
+	}
+
+	fn cloned_object_ref<'a>(object_ref: Self::ObjectRef<'a>) -> Self::Object
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a,
+	{
+		object_ref.cloned()
+	}
+}
+
 /// A simple serializer generating a list of `Quad`s.
 struct QuadSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
 	vocabulary: &'a mut V,
@@ -563,7 +817,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
 	for QuadSerializer<'a, V, I, D>
 {
 	type Ok = Vec<DomainQuad<V, I, D>>;
-	type Error = Error;
+	type Error = IntoQuadsError;
 
 	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -615,7 +869,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> GraphVisitor<V, I>
 	for QuadGraphSerializer<'a, V, I, D>
 {
 	type Ok = ();
-	type Error = Error;
+	type Error = IntoQuadsError;
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -660,14 +914,14 @@ enum SubjectOrObject<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
 }
 
 impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectOrObject<'a, V, I, D> {
-	fn into_subject(self, domain: &D) -> Result<&'a D::Subject, Error> {
+	fn into_subject(self, domain: &D) -> Result<&'a D::Subject, IntoQuadsError> {
 		match self {
 			Self::Subject(s) => Ok(s),
 			Self::Object(o) => domain.object_as_subject(o),
 		}
 	}
 
-	fn into_object(self, domain: &D) -> Result<D::ObjectRef<'a>, Error> {
+	fn into_object(self, domain: &D) -> Result<D::ObjectRef<'a>, IntoQuadsError> {
 		match self {
 			Self::Subject(s) => domain.subject_as_object(s),
 			Self::Object(o) => Ok(D::object_as_ref(o)),
@@ -679,7 +933,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 	for QuadPropertiesSerializer<'a, V, I, D>
 {
 	type Ok = ();
-	type Error = Error;
+	type Error = IntoQuadsError;
 
 	fn predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
 	where
@@ -788,7 +1042,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 	for ObjectsSerializer<'a, V, I, D>
 {
 	type Ok = ();
-	type Error = Error;
+	type Error = IntoQuadsError;
 
 	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -836,7 +1090,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 	for ReversePredicateSerializer<'a, V, I, D>
 {
 	type Ok = ();
-	type Error = Error;
+	type Error = IntoQuadsError;
 
 	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where

@@ -12,6 +12,15 @@ pub trait LinkedDataGraph<V: Vocabulary, I: Interpretation> {
 		S: GraphVisitor<V, I>;
 }
 
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for () {
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<V, I>,
+	{
+		visitor.end()
+	}
+}
+
 impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
 	for &'a T
 {

@@ -12,6 +12,15 @@ pub trait LinkedDataPredicateObjects<V: Vocabulary = (), I: Interpretation = ()>
 		S: PredicateObjectsVisitor<V, I>;
 }
 
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for () {
+	fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: PredicateObjectsVisitor<V, I>,
+	{
+		visitor.end()
+	}
+}
+
 impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataPredicateObjects<V, I>>
 	LinkedDataPredicateObjects<V, I> for &'a T
 {

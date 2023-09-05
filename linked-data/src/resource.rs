@@ -135,6 +135,16 @@ impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataResource<V, I>>
 	}
 }
 
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for () {
+	fn interpretation(
+		&self,
+		_vocabulary: &mut V,
+		_interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		ResourceInterpretation::Uninterpreted(None)
+	}
+}
+
 /// Anonymous lexical representation.
 ///
 /// This type implements the `LexicalRepresentation` trait, producing a blank

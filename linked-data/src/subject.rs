@@ -10,6 +10,15 @@ pub trait LinkedDataSubject<V: Vocabulary = (), I: Interpretation = ()> {
 		S: SubjectVisitor<V, I>;
 }
 
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for () {
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		serializer.end()
+	}
+}
+
 impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>>
 	LinkedDataSubject<V, I> for &'a T
 {

@@ -66,7 +66,10 @@ mod subject;
 pub use anonymous::*;
 pub use graph::*;
 pub use predicate::*;
-pub use quads::{to_interpreted_quads, to_interpreted_subject_quads, to_quads, to_quads_with};
+pub use quads::{
+	to_interpreted_quads, to_interpreted_subject_quads, to_lexical_quads, to_lexical_quads_with,
+	to_quads, to_quads_with, IntoQuadsError,
+};
 pub use rdf::*;
 pub use resource::*;
 pub use subject::*;

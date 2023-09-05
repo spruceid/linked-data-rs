@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
-use crate::generate::{extend_generics, TypeAttributes};
+use crate::generate::{extend_generics, TypeAttributes, RDF_TYPE};
 
 use super::{variant_compound_fields, Error};
 
@@ -27,6 +27,23 @@ pub fn generate(
 	)?;
 
 	let mut bounds: Vec<syn::WherePredicate> = fields.visit.bounds;
+
+	let visit_type = attrs
+		.type_
+		.as_ref()
+		.map(|ty| {
+			let iri = ty.expand(&attrs.prefixes)?.into_string();
+			let rdf_type = RDF_TYPE.as_str();
+
+			Ok(quote! {
+				visitor.predicate(
+					::linked_data::iref::Iri::new(#rdf_type).unwrap(),
+					::linked_data::iref::Iri::new(#iri).unwrap()
+				)?;
+			})
+		})
+		.transpose()?;
+
 	let visit = fields.visit.body;
 	let vocabulary_bounds = fields.visit.vocabulary_bounds;
 
@@ -68,6 +85,7 @@ pub fn generate(
 			where
 				S_: ::linked_data::SubjectVisitor<V_, I_>
 			{
+				#visit_type
 				#visit
 			}
 		}
