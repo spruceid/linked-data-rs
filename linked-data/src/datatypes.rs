@@ -1,4 +1,4 @@
-use rdf_types::{Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary};
+use rdf_types::{Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary, Id};
 
 use crate::{
 	CowRdfTerm, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
@@ -107,10 +107,60 @@ datatype! {
 	i32: Int,
 	i64: Long,
 	String: String,
-	iref::UriBuf: AnyUri,
+	// iref::UriBuf: AnyUri,
 	xsd_types::DateTime: DateTime
 }
 
 unsized_datatype! {
 	str: String
+}
+
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for xsd_types::AnyUriBuf
+where
+	V::Value: From<String>
+{
+	fn interpretation(
+		&self,
+		_vocabulary: &mut V,
+		_interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Xsd(
+			xsd_types::Value::AnyUri(self.clone())
+		)))))
+	}
+
+	fn reference_interpretation(
+		&self,
+		vocabulary: &mut V,
+		_interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Id(Id::Iri(
+			vocabulary.insert(self.as_iri()),
+		)))))
+	}
+}
+
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for xsd_types::AnyUriBuf
+where
+	V::Value: From<String>
+{
+	fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: crate::SubjectVisitor<V, I>
+	{
+		visitor.end()
+	}
+}
+
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for xsd_types::AnyUriBuf
+where
+	V::Value: From<String>
+{
+	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: PredicateObjectsVisitor<V, I>,
+	{
+		visitor.object(self)?;
+		visitor.end()
+	}
 }

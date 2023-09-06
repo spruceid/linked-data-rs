@@ -109,6 +109,14 @@ pub trait LinkedDataResource<V: Vocabulary = (), I: Interpretation = ()> {
 		self.interpretation(vocabulary, interpretation)
 			.into_lexical_representation(vocabulary, interpretation)
 	}
+
+	fn reference_interpretation(
+		&self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+	) -> ResourceInterpretation<V, I> {
+		self.interpretation(vocabulary, interpretation)
+	}
 }
 
 impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataResource<V, I>>
@@ -224,8 +232,8 @@ impl<
 		interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
 		match self {
-			Self::Iri(i) => i.interpretation(vocabulary, interpretation),
-			Self::Blank(b) => b.interpretation(vocabulary, interpretation),
+			Self::Iri(i) => i.reference_interpretation(vocabulary, interpretation),
+			Self::Blank(b) => b.reference_interpretation(vocabulary, interpretation),
 		}
 	}
 }
