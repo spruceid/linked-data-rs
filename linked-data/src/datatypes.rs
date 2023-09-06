@@ -1,4 +1,4 @@
-use rdf_types::{Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary, Id};
+use rdf_types::{Id, Interpretation, IriVocabularyMut, LiteralVocabularyMut, Term, Vocabulary};
 
 use crate::{
 	CowRdfTerm, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
@@ -115,18 +115,19 @@ unsized_datatype! {
 	str: String
 }
 
-impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for xsd_types::AnyUriBuf
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
+	LinkedDataResource<V, I> for xsd_types::AnyUriBuf
 where
-	V::Value: From<String>
+	V::Value: From<String>,
 {
 	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
 	) -> ResourceInterpretation<V, I> {
-		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Xsd(
-			xsd_types::Value::AnyUri(self.clone())
-		)))))
+		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
+			RdfLiteral::Xsd(xsd_types::Value::AnyUri(self.clone())),
+		))))
 	}
 
 	fn reference_interpretation(
@@ -140,21 +141,23 @@ where
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for xsd_types::AnyUriBuf
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
+	LinkedDataSubject<V, I> for xsd_types::AnyUriBuf
 where
-	V::Value: From<String>
+	V::Value: From<String>,
 {
 	fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::SubjectVisitor<V, I>
+		S: crate::SubjectVisitor<V, I>,
 	{
 		visitor.end()
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for xsd_types::AnyUriBuf
+impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
+	LinkedDataPredicateObjects<V, I> for xsd_types::AnyUriBuf
 where
-	V::Value: From<String>
+	V::Value: From<String>,
 {
 	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where

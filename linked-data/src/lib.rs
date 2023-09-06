@@ -60,9 +60,9 @@ mod graph;
 mod predicate;
 mod quads;
 mod rdf;
+mod reference;
 mod resource;
 mod subject;
-mod reference;
 
 pub use anonymous::*;
 pub use graph::*;
@@ -72,9 +72,9 @@ pub use quads::{
 	to_quads, to_quads_with, IntoQuadsError,
 };
 pub use rdf::*;
+pub use reference::*;
 pub use resource::*;
 pub use subject::*;
-pub use reference::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FromLinkedDataError {
