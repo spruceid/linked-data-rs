@@ -102,6 +102,7 @@ pub struct FieldAttributes {
 	iri: Option<CompactIri>,
 	flatten: bool,
 	is_id: bool,
+	graph_value: bool,
 }
 
 pub struct VariantAttributes {
@@ -323,59 +324,73 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
 	let mut iri = None;
 	let mut flatten = false;
 	let mut is_id = false;
+	let mut graph_value = false;
 
 	for attr in attributes {
 		if attr.path().is_ident("ld") {
-			let span = attr.span();
 			match attr.meta {
 				syn::Meta::List(list) => {
 					let mut tokens = list.tokens.into_iter();
-					match tokens.next() {
-						Some(TokenTree::Ident(id)) => {
-							if id == "ignore" {
-								ignore = true
-							} else if id == "flatten" {
-								flatten = true
-							} else if id == "id" {
-								is_id = true
-							} else if id == "type" {
-								iri = Some(CompactIri(RDF_TYPE.to_owned(), id.span()));
-							} else {
-								return Err(Error::InvalidAttribute(
-									AttributeError::UnknownIdent,
-									id.span(),
-								));
+					while let Some(token) = tokens.next() {
+						match token {
+							TokenTree::Ident(id) => {
+								if id == "ignore" {
+									ignore = true
+								} else if id == "flatten" {
+									flatten = true
+								} else if id == "id" {
+									is_id = true
+								} else if id == "type" {
+									iri = Some(CompactIri(RDF_TYPE.to_owned(), id.span()));
+								} else if id == "graph" {
+									graph_value = true
+								} else {
+									return Err(Error::InvalidAttribute(
+										AttributeError::UnknownIdent,
+										id.span(),
+									));
+								}
 							}
-						}
-						Some(TokenTree::Literal(l)) => {
-							let l = syn::Lit::new(l);
-							match l {
-								syn::Lit::Str(l) => match IriBuf::new(l.value()) {
-									Ok(value) => {
-										iri = Some(CompactIri(value, l.span()));
-									}
-									Err(_) => {
+							TokenTree::Literal(l) => {
+								let l = syn::Lit::new(l);
+								match l {
+									syn::Lit::Str(l) => match IriBuf::new(l.value()) {
+										Ok(value) => {
+											iri = Some(CompactIri(value, l.span()));
+										}
+										Err(_) => {
+											return Err(Error::InvalidAttribute(
+												AttributeError::InvalidCompactIri,
+												l.span(),
+											))
+										}
+									},
+									l => {
 										return Err(Error::InvalidAttribute(
-											AttributeError::InvalidCompactIri,
+											AttributeError::ExpectedString,
 											l.span(),
 										))
 									}
-								},
-								l => {
-									return Err(Error::InvalidAttribute(
-										AttributeError::ExpectedString,
-										l.span(),
-									))
 								}
 							}
+							token => {
+								return Err(Error::InvalidAttribute(
+									AttributeError::UnexpectedToken,
+									token.span(),
+								))
+							}
 						}
-						Some(token) => {
-							return Err(Error::InvalidAttribute(
-								AttributeError::UnexpectedToken,
-								token.span(),
-							))
+
+						match tokens.next() {
+							Some(TokenTree::Punct(p)) if p.as_char() == ',' => (),
+							Some(token) => {
+								return Err(Error::InvalidAttribute(
+									AttributeError::UnexpectedToken,
+									token.span(),
+								))
+							}
+							None => break,
 						}
-						None => return Err(Error::InvalidAttribute(AttributeError::Empty, span)),
 					}
 				}
 				_ => {
@@ -393,6 +408,7 @@ fn read_field_attributes(attributes: Vec<syn::Attribute>) -> Result<FieldAttribu
 		iri,
 		flatten,
 		is_id,
+		graph_value,
 	})
 }
 

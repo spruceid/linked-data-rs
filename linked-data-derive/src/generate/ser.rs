@@ -100,18 +100,35 @@ fn variant_compound_fields(
 					Some(compact_iri) => {
 						let iri = compact_iri.expand(&attrs.prefixes)?.into_string();
 						visit.vocabulary_bounds.iri_mut = true;
-						visit.bounds.push(
-							syn::parse2(quote!(
-								#ty: ::linked_data::LinkedDataPredicateObjects<V_, I_>
-							))
-							.unwrap(),
-						);
 
-						quote! {
-							visitor.predicate(
-								::linked_data::iref::Iri::new(#iri).unwrap(),
-								#field_ref
-							)?;
+						if field_attrs.graph_value {
+							visit.bounds.push(
+								syn::parse2(quote!(
+									#ty: ::linked_data::LinkedDataGraph<V_, I_>
+								))
+								.unwrap(),
+							);
+
+							quote! {
+								visitor.predicate(
+									::linked_data::iref::Iri::new(#iri).unwrap(),
+									&Some(::linked_data::AnonymousGraph(#field_ref))
+								)?;
+							}
+						} else {
+							visit.bounds.push(
+								syn::parse2(quote!(
+									#ty: ::linked_data::LinkedDataPredicateObjects<V_, I_>
+								))
+								.unwrap(),
+							);
+
+							quote! {
+								visitor.predicate(
+									::linked_data::iref::Iri::new(#iri).unwrap(),
+									#field_ref
+								)?;
+							}
 						}
 					}
 					None => return Err(Error::UnknownFieldSerializationMethod(span)),
