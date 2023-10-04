@@ -103,6 +103,15 @@ impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedData<V, I>> LinkedD
 	}
 }
 
+impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedData<V, I>> LinkedData<V, I> for Box<T> {
+	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: Visitor<V, I>,
+	{
+		T::visit(self, visitor)
+	}
+}
+
 impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Iri {
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where

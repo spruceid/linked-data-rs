@@ -32,6 +32,17 @@ impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> Li
 	}
 }
 
+impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
+	for Box<T>
+{
+	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<V, I>,
+	{
+		T::visit_graph(self, visitor)
+	}
+}
+
 impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Iri {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where

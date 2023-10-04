@@ -30,6 +30,17 @@ impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>>
 	}
 }
 
+impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>> LinkedDataSubject<V, I>
+	for Box<T>
+{
+	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: SubjectVisitor<V, I>,
+	{
+		T::visit_subject(self, serializer)
+	}
+}
+
 impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Iri {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
