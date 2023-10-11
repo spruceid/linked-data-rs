@@ -162,9 +162,18 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 }
 
 pub trait LinkedDataDeserializeSubject<V: Vocabulary = (), I: Interpretation = ()>: Sized {
-	fn deserialize_subject(
-		vocabulary: &mut V,
-		interpretation: &mut I,
-		value: &impl LinkedDataSubject<V, I>,
-	) -> Result<Self, FromLinkedDataError>;
+	fn deserialize_subject<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		resource: &I::Resource,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>;
 }

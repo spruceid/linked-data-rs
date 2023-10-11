@@ -3,11 +3,11 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{punctuated::Punctuated, spanned::Spanned};
 
-use crate::generate::{
-	extend_generics, read_variant_attributes, TypeAttributes, VariantAttributes,
-};
+use crate::{generate::{
+	extend_generics, read_variant_attributes, TypeAttributes, VariantAttributes, VocabularyBounds, InterpretationBounds,
+}, utils::UsesGenericParam};
 
-use super::{variant_compound_fields, Error, VocabularyBounds};
+use super::{variant_compound_fields, Error};
 
 pub fn generate(
 	attrs: &TypeAttributes,
@@ -149,20 +149,22 @@ pub fn generate(
 	);
 
 	let repr_generics =
-		extend_generics(&generics, VocabularyBounds::default(), lexical_repr_bounds);
+		extend_generics(&generics, VocabularyBounds::default(), InterpretationBounds::default(), lexical_repr_bounds);
 	let subject_generics = extend_generics(
 		&generics,
 		visit_subject_vocabulary_bounds,
+		InterpretationBounds::default(),
 		visit_subject_bounds,
 	);
 	let predicate_generics = extend_generics(
 		&generics,
 		visit_predicate_vocabulary_bounds,
+		InterpretationBounds::default(),
 		visit_predicate_bounds,
 	);
 	let graph_generics =
-		extend_generics(&generics, visit_graph_vocabulary_bounds, visit_graph_bounds);
-	let dataset_generics = extend_generics(&generics, visit_ld_vocabulary_bounds, visit_ld_bounds);
+		extend_generics(&generics, visit_graph_vocabulary_bounds, InterpretationBounds::default(), visit_graph_bounds);
+	let dataset_generics = extend_generics(&generics, visit_ld_vocabulary_bounds, InterpretationBounds::default(), visit_ld_bounds);
 
 	let (_, ty_generics, _) = generics.split_for_impl();
 	let (repr_impl_generics, _, repr_where_clauses) = repr_generics.split_for_impl();
@@ -264,149 +266,9 @@ impl StrippedVariant {
 	}
 }
 
-pub trait UsesGenericParam {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool;
-}
-
 impl UsesGenericParam for StrippedVariant {
 	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
 		self.fields.iter().any(|f| f.ty.uses_generic_param(p))
-	}
-}
-
-impl UsesGenericParam for syn::Type {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match self {
-			Self::Array(a) => a.elem.uses_generic_param(p),
-			Self::BareFn(t) => {
-				t.inputs.iter().any(|i| i.ty.uses_generic_param(p))
-					|| t.output.uses_generic_param(p)
-			}
-			Self::Group(g) => g.elem.uses_generic_param(p),
-			Self::ImplTrait(t) => t.bounds.iter().any(|b| b.uses_generic_param(p)),
-			Self::Paren(t) => t.elem.uses_generic_param(p),
-			Self::Path(t) => t.uses_generic_param(p),
-			Self::Ptr(t) => t.elem.uses_generic_param(p),
-			Self::Reference(t) => {
-				if let Some(l) = &t.lifetime {
-					if l.uses_generic_param(p) {
-						return true;
-					}
-				}
-
-				t.elem.uses_generic_param(p)
-			}
-			Self::Slice(t) => t.elem.uses_generic_param(p),
-			Self::TraitObject(t) => t.bounds.iter().any(|b| b.uses_generic_param(p)),
-			Self::Tuple(t) => t.elems.iter().any(|t| t.uses_generic_param(p)),
-			_ => false,
-		}
-	}
-}
-
-impl UsesGenericParam for syn::TypePath {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		if let Some(qself) = &self.qself {
-			if qself.ty.uses_generic_param(p) {
-				return true;
-			}
-		}
-
-		self.path.uses_generic_param(p)
-	}
-}
-
-impl UsesGenericParam for syn::ReturnType {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match self {
-			Self::Default => false,
-			Self::Type(_, ty) => ty.uses_generic_param(p),
-		}
-	}
-}
-
-impl UsesGenericParam for syn::TypeParamBound {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match self {
-			Self::Lifetime(l) => l.uses_generic_param(p),
-			Self::Trait(t) => t.uses_generic_param(p),
-			_ => false,
-		}
-	}
-}
-
-impl UsesGenericParam for syn::Lifetime {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match p {
-			syn::GenericParam::Lifetime(l) => self.ident == l.lifetime.ident,
-			_ => false,
-		}
-	}
-}
-
-impl UsesGenericParam for syn::TraitBound {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		self.path.uses_generic_param(p)
-	}
-}
-
-impl UsesGenericParam for syn::Path {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		if let syn::GenericParam::Type(t) = p {
-			if self.segments.len() == 1 && self.segments.first().unwrap().ident == t.ident {
-				return true;
-			}
-		}
-
-		self.segments.iter().any(|s| s.uses_generic_param(p))
-	}
-}
-
-impl UsesGenericParam for syn::PathSegment {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match &self.arguments {
-			syn::PathArguments::None => false,
-			syn::PathArguments::AngleBracketed(a) => a.args.iter().any(|a| a.uses_generic_param(p)),
-			syn::PathArguments::Parenthesized(a) => {
-				a.inputs.iter().any(|i| i.uses_generic_param(p)) || a.output.uses_generic_param(p)
-			}
-		}
-	}
-}
-
-impl UsesGenericParam for syn::GenericArgument {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		match self {
-			Self::AssocType(a) => a.uses_generic_param(p),
-			Self::Constraint(c) => c.uses_generic_param(p),
-			Self::Lifetime(l) => l.uses_generic_param(p),
-			Self::Type(t) => t.uses_generic_param(p),
-			_ => false,
-		}
-	}
-}
-
-impl UsesGenericParam for syn::AssocType {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		if let Some(generics) = &self.generics {
-			if generics.args.iter().any(|a| a.uses_generic_param(p)) {
-				return true;
-			}
-		}
-
-		self.ty.uses_generic_param(p)
-	}
-}
-
-impl UsesGenericParam for syn::Constraint {
-	fn uses_generic_param(&self, p: &syn::GenericParam) -> bool {
-		if let Some(generics) = &self.generics {
-			if generics.args.iter().any(|a| a.uses_generic_param(p)) {
-				return true;
-			}
-		}
-
-		self.bounds.iter().any(|b| b.uses_generic_param(p))
 	}
 }
 
@@ -914,11 +776,13 @@ fn variant_subject_type(
 	let repr_generics = extend_generics(
 		&nest_generics,
 		VocabularyBounds::default(),
+		InterpretationBounds::default(),
 		lexical_repr_bounds.clone(),
 	);
 	let visit_generics = extend_generics(
 		&nest_generics,
 		visit_vocabulary_bounds,
+		InterpretationBounds::default(),
 		visit_bounds.clone(),
 	);
 

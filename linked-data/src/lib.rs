@@ -54,6 +54,9 @@ pub use rdf_types;
 #[doc(hidden)]
 pub use xsd_types;
 
+#[doc(hidden)]
+pub use grdf;
+
 mod anonymous;
 mod datatypes;
 mod graph;
@@ -78,7 +81,30 @@ pub use subject::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FromLinkedDataError {
-	// ...
+	/// Resource has no literal interpretation.
+	#[error("expected literal")]
+	ExpectedLiteral,
+
+	/// Resource has literal interpretations, but none of the expected type.
+	#[error("literal type mismatch")]
+	LiteralTypeMismatch,
+
+	/// Resource has a literal interpretation of the correct type, but the
+	/// lexical value could not be successfully parsed.
+	#[error("invalid literal")]
+	InvalidLiteral,
+
+	/// Missing required value.
+	#[error("missing required value")]
+	MissingRequiredValue,
+
+	/// Too many values.
+	#[error("too many values")]
+	TooManyValues,
+
+	/// Generic error for invalid subjects.
+	#[error("invalid subject")]
+	InvalidSubject,
 }
 
 /// Linked-Data type.
@@ -170,8 +196,13 @@ impl<'s, V: Vocabulary, I: Interpretation, S: Visitor<V, I>> Visitor<V, I> for &
 
 pub trait LinkedDataDeserialize<V: Vocabulary = (), I: Interpretation = ()>: Sized {
 	fn deserialize_dataset(
-		vocabulary: &mut V,
-		interpretation: &mut I,
-		value: &impl LinkedData<V, I>,
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &impl grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
 	) -> Result<Self, FromLinkedDataError>;
 }

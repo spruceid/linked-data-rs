@@ -1,8 +1,8 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{spanned::Spanned, DeriveInput};
 
-use super::{read_field_attributes, read_type_attributes, Error, TypeAttributes};
+use super::{read_field_attributes, read_type_attributes, Error, TypeAttributes, VocabularyBounds};
 
 mod r#enum;
 mod r#struct;
@@ -13,31 +13,6 @@ pub fn subject(input: DeriveInput) -> Result<TokenStream, Error> {
 		syn::Data::Struct(s) => r#struct::generate(&attrs, input.ident, input.generics, s),
 		syn::Data::Enum(e) => r#enum::generate(&attrs, input.ident, input.generics, e),
 		syn::Data::Union(u) => Err(Error::UnionType(u.union_token.span())),
-	}
-}
-
-#[derive(Default, Clone, Copy)]
-pub struct VocabularyBounds {
-	iri_mut: bool,
-}
-
-impl VocabularyBounds {
-	pub fn add(&mut self, other: Self) {
-		self.iri_mut |= other.iri_mut
-	}
-}
-
-impl ToTokens for VocabularyBounds {
-	fn to_tokens(&self, tokens: &mut TokenStream) {
-		tokens.extend(quote! {
-			::linked_data::rdf_types::Vocabulary
-		});
-
-		if self.iri_mut {
-			tokens.extend(quote! {
-				+ ::linked_data::rdf_types::IriVocabularyMut
-			})
-		}
 	}
 }
 

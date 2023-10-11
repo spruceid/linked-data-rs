@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
-use crate::generate::{extend_generics, TypeAttributes, RDF_TYPE};
+use crate::generate::{extend_generics, TypeAttributes, RDF_TYPE, InterpretationBounds};
 
 use super::{variant_compound_fields, Error};
 
@@ -65,7 +65,7 @@ pub fn generate(
 		},
 	};
 
-	let ld_generics = extend_generics(&generics, vocabulary_bounds, bounds);
+	let ld_generics = extend_generics(&generics, vocabulary_bounds, InterpretationBounds::default(), bounds);
 	let (_, ty_generics, _) = generics.split_for_impl();
 	let (impl_generics, _, where_clause) = ld_generics.split_for_impl();
 

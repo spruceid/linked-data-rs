@@ -2,12 +2,10 @@ use std::collections::HashMap;
 
 use iref::{InvalidIri, Iri, IriBuf};
 use proc_macro2::{Span, TokenStream, TokenTree};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use static_iref::iri;
 
 use syn::{punctuated::Punctuated, spanned::Spanned};
-
-use self::ser::VocabularyBounds;
 
 pub mod de;
 pub mod ser;
@@ -109,9 +107,69 @@ pub struct VariantAttributes {
 	iri: Option<CompactIri>,
 }
 
+
+#[derive(Default, Clone, Copy)]
+pub struct VocabularyBounds {
+	pub iri_mut: bool,
+}
+
+impl VocabularyBounds {
+	pub fn add(&mut self, other: Self) {
+		self.iri_mut |= other.iri_mut
+	}
+}
+
+impl ToTokens for VocabularyBounds {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(quote! {
+			::linked_data::rdf_types::Vocabulary
+		});
+
+		if self.iri_mut {
+			tokens.extend(quote! {
+				+ ::linked_data::rdf_types::IriVocabularyMut
+			})
+		}
+	}
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct InterpretationBounds {
+	pub iri_mut: bool,
+	pub reverse_iri: bool
+}
+
+impl InterpretationBounds {
+	pub fn add(&mut self, other: Self) {
+		self.iri_mut |= other.iri_mut;
+		self.reverse_iri |= other.reverse_iri
+	}
+}
+
+impl ToTokens for InterpretationBounds {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(quote! {
+			::linked_data::rdf_types::Interpretation
+		});
+
+		if self.iri_mut {
+			tokens.extend(quote! {
+				+ ::linked_data::rdf_types::IriInterpretation<V_::Iri>
+			})
+		}
+
+		if self.reverse_iri {
+			tokens.extend(quote! {
+				+ ::linked_data::rdf_types::interpretation::ReverseIriInterpretation<Iri = V_::Iri>
+			})
+		}
+	}
+}
+
 fn extend_generics(
 	generics: &syn::Generics,
 	vocabulary_bounds: VocabularyBounds,
+	interpertation_bounds: InterpretationBounds,
 	mut bounds: Vec<syn::WherePredicate>,
 ) -> syn::Generics {
 	let mut result = generics.clone();
@@ -143,7 +201,7 @@ fn extend_generics(
 
 	bounds.push(
 		syn::parse2(quote! {
-			I_: ::linked_data::rdf_types::Interpretation
+			I_: #interpertation_bounds
 		})
 		.unwrap(),
 	);

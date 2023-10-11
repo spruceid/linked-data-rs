@@ -3,7 +3,7 @@ use rdf_types::{
 	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut, Vocabulary,
 };
 
-use crate::{LinkedDataResource, LinkedDataSubject};
+use crate::{FromLinkedDataError, LinkedDataResource, LinkedDataSubject};
 
 /// Type representing the objects of an RDF subject's predicate binding.
 pub trait LinkedDataPredicateObjects<V: Vocabulary = (), I: Interpretation = ()> {
@@ -165,4 +165,24 @@ pub trait PredicateObjectsVisitor<V: Vocabulary, I: Interpretation> {
 		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>;
 
 	fn end(self) -> Result<Self::Ok, Self::Error>;
+}
+
+pub trait LinkedDataDeserializePredicateObjects<V: Vocabulary = (), I: Interpretation = ()>:
+	Sized
+{
+	fn deserialize_objects<'a, D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		objects: impl IntoIterator<Item = &'a I::Resource>,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		I::Resource: 'a,
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>;
 }

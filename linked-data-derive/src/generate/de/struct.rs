@@ -1,105 +1,79 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-use crate::generate::{read_field_attributes, TypeAttributes};
+use crate::generate::{TypeAttributes, extend_generics, VocabularyBounds};
 
-use super::Error;
-
-fn generate_field(
-	attrs: Vec<syn::Attribute>,
-	_ty: &syn::Type,
-	_cases: &mut Vec<TokenStream>,
-) -> Result<TokenStream, Error> {
-	let _attrs = read_field_attributes(attrs)?;
-
-	// let iri = attrs.iri
-
-	// Ok(quote! {
-	// 	if iri == #iri {
-	// 		// ...
-	// 	}
-	// })
-	todo!()
-}
+use super::{Error, FieldsDeserialization, generate_fields};
 
 pub fn generate(
-	_attrs: &TypeAttributes,
+	attrs: &TypeAttributes,
 	ident: Ident,
+	generics: syn::Generics,
 	s: syn::DataStruct,
 ) -> Result<TokenStream, Error> {
-	let mut cases = Vec::with_capacity(s.fields.len());
-	let data_struct = match s.fields {
-		syn::Fields::Unit => quote!(
-			struct Data;
-		),
-		syn::Fields::Unnamed(fields) => {
-			let mut opt_fields = Vec::with_capacity(fields.unnamed.len());
-			for (_i, f) in fields.unnamed.into_iter().enumerate() {
-				// let index = syn::Index {
-				// 	index: i as u32,
-				// 	span: f.span()
-				// };
-				let ty = f.ty;
-				generate_field(f.attrs, &ty, &mut cases)?;
-				opt_fields.push(quote!(#ty));
-			}
+	let FieldsDeserialization {
+		deserialize_fields,
+		constructor,
+		interpretation_bounds,
+		bounds
+	} = generate_fields(attrs, s.fields)?;
 
-			quote!(struct Data( #(#opt_fields),* );)
-		}
-		syn::Fields::Named(fields) => {
-			let opt_fields = fields.named.into_iter().map(|f| {
-				let ident = f.ident;
-				let ty = f.ty;
-				quote!(#ident: #ty)
-			});
-
-			quote!(struct Data {
-				#(#opt_fields),*
-			})
-		}
-	};
+	let vocabulary_bounds = VocabularyBounds::default();
+	let ld_generics = extend_generics(&generics, vocabulary_bounds, interpretation_bounds, bounds);
+	let (_, ty_generics, _) = generics.split_for_impl();
+	let (impl_generics, _, where_clause) = ld_generics.split_for_impl();
 
 	Ok(quote! {
-		impl<V, I> ::linked_data::LinkedDataDeserializeSubject<V, I> for #ident {
-			fn deserialize_subject(
-				vocabulary: &V,
-				interpretation: &I,
-				subject: &impl LinkedDataSubject<V, I>
-			) -> Result<Self, FromLinkedDataError> {
-				#data_struct
+		impl #impl_generics ::linked_data::LinkedDataDeserializeSubject<V_, I_> for #ident #ty_generics #where_clause {
+			fn deserialize_subject<D_>(
+				vocabulary_: &V_,
+				interpretation_: &I_,
+				dataset_: &D_,
+				graph_: &D_::Graph,
+				resource_: &I_::Resource
+			) -> Result<Self, ::linked_data::FromLinkedDataError>
+			where
+				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+			{
+				#(#deserialize_fields)*
+				Ok(Self #constructor)
+			}
+		}
 
-				struct Visitor {
-					vocabulary: &V,
-					interpretation: &I,
-					data: Data
-				}
+		impl #impl_generics ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_> for #ident #ty_generics #where_clause {
+			fn deserialize_objects<'a, D_>(
+				vocabulary: &V_,
+				interpretation: &I_,
+				dataset: &D_,
+				graph: &D_::Graph,
+				objects: impl IntoIterator<Item = &'a I_::Resource>
+			) -> Result<Self, ::linked_data::FromLinkedDataError>
+			where
+				I_::Resource: 'a,
+				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+			{
+				let mut objects = objects.into_iter();
 
-				impl<V, I> SubjectVisitor<V, I> for Visitor<V, I> {
-					fn predicate(
-						&mut self,
-						predicate: &P,
-						objects: &O
-					) {
-						let repr = predicate.lexical_representation(
-							self.vocabulary,
-							self.interpretation
-						);
+				match objects.next() {
+					Some(object) => {
+						let value = <Self as ::linked_data::LinkedDataDeserializeSubject<V_, I_>>::deserialize_subject(
+							vocabulary,
+							interpretation,
+							dataset,
+							graph,
+							object
+						)?;
 
-						if let Some(Term::Id(Id::Iri(iri))) = repr {
-							let iri = vocabulary.iri(&iri).unwrap();
-							#(#cases)else*
+						if objects.next().is_some() {
+							Err(::linked_data::FromLinkedDataError::TooManyValues)
+						} else {
+							Ok(value)
 						}
-
-						Ok(Self {
-
-						})
+					}
+					None => {
+						Err(::linked_data::FromLinkedDataError::MissingRequiredValue)
 					}
 				}
-
-				subject.visit_subject(Visitor {
-					vocabulary,
-					interpretation
-				})
 			}
 		}
 	})
