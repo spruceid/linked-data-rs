@@ -41,15 +41,15 @@ pub fn generate(
 		}
 
 		impl #impl_generics ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_> for #ident #ty_generics #where_clause {
-			fn deserialize_objects<'a, D_>(
+			fn deserialize_objects<'de_, D_>(
 				vocabulary: &V_,
 				interpretation: &I_,
 				dataset: &D_,
 				graph: &D_::Graph,
-				objects: impl IntoIterator<Item = &'a I_::Resource>
+				objects: impl IntoIterator<Item = &'de_ I_::Resource>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
-				I_::Resource: 'a,
+				I_::Resource: 'de_,
 				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
 			{
 				let mut objects = objects.into_iter();
