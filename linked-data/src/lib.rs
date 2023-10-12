@@ -66,6 +66,7 @@ mod rdf;
 mod reference;
 mod resource;
 mod subject;
+mod r#impl;
 
 pub use anonymous::*;
 pub use graph::*;
