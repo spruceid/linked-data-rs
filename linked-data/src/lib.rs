@@ -60,13 +60,13 @@ pub use grdf;
 mod anonymous;
 mod datatypes;
 mod graph;
+mod r#impl;
 mod predicate;
 mod quads;
 mod rdf;
 mod reference;
 mod resource;
 mod subject;
-mod r#impl;
 
 pub use anonymous::*;
 pub use graph::*;

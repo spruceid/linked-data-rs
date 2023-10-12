@@ -107,7 +107,6 @@ pub struct VariantAttributes {
 	iri: Option<CompactIri>,
 }
 
-
 #[derive(Default, Clone, Copy)]
 pub struct VocabularyBounds {
 	pub iri_mut: bool,
@@ -136,7 +135,7 @@ impl ToTokens for VocabularyBounds {
 #[derive(Default, Clone, Copy)]
 pub struct InterpretationBounds {
 	pub iri_mut: bool,
-	pub reverse_iri: bool
+	pub reverse_iri: bool,
 }
 
 impl InterpretationBounds {

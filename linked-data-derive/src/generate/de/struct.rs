@@ -1,9 +1,9 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-use crate::generate::{TypeAttributes, extend_generics, VocabularyBounds};
+use crate::generate::{extend_generics, TypeAttributes, VocabularyBounds};
 
-use super::{Error, FieldsDeserialization, generate_fields};
+use super::{generate_fields, Error, FieldsDeserialization};
 
 pub fn generate(
 	attrs: &TypeAttributes,
@@ -15,7 +15,7 @@ pub fn generate(
 		deserialize_fields,
 		constructor,
 		interpretation_bounds,
-		bounds
+		bounds,
 	} = generate_fields(attrs, s.fields)?;
 
 	let vocabulary_bounds = VocabularyBounds::default();

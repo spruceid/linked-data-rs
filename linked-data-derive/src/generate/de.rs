@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use proc_macro2::TokenStream;
 
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 use syn::{spanned::Spanned, DeriveInput};
 
-use super::{read_type_attributes, Error, TypeAttributes, InterpretationBounds, read_field_attributes};
+use super::{
+	read_field_attributes, read_type_attributes, Error, InterpretationBounds, TypeAttributes,
+};
 
 mod r#enum;
 mod r#struct;
@@ -23,7 +25,7 @@ struct FieldsDeserialization {
 	deserialize_fields: Vec<TokenStream>,
 	constructor: TokenStream,
 	interpretation_bounds: InterpretationBounds,
-	bounds: Vec<syn::WherePredicate>
+	bounds: Vec<syn::WherePredicate>,
 }
 
 fn generate_fields(
@@ -39,13 +41,26 @@ fn generate_fields(
 			let mut fields_constructors = Vec::with_capacity(fields.unnamed.len());
 			for (i, f) in fields.unnamed.into_iter().enumerate() {
 				let ident = format_ident!("a{i}");
-				let deserialize_field = generate_field(&attrs.prefixes, f.attrs, &f.ty, &mut interpretation_bounds, &mut bounds)?;
+				match generate_field(
+					&attrs.prefixes,
+					f.attrs,
+					&f.ty,
+					&mut interpretation_bounds,
+					&mut bounds,
+				)? {
+					Some(deserialize_field) => {
+						deserialize_fields.push(quote! {
+							let #ident = #deserialize_field ;
+						});
 
-				deserialize_fields.push(quote! {
-					let #ident = #deserialize_field ;
-				});
-
-				fields_constructors.push(quote!(#ident));
+						fields_constructors.push(quote!(#ident));
+					}
+					None => {
+						let ty = &f.ty;
+						fields_constructors
+							.push(quote!(<#ty as ::std::default::Default>::default()));
+					}
+				}
 			}
 
 			quote!(( #(#fields_constructors),* ))
@@ -54,13 +69,27 @@ fn generate_fields(
 			let mut fields_constructors = Vec::with_capacity(fields.named.len());
 			for f in fields.named {
 				let ident = f.ident;
-				let deserialize_field = generate_field(&attrs.prefixes, f.attrs, &f.ty, &mut interpretation_bounds, &mut bounds)?;
 
-				deserialize_fields.push(quote! {
-					let #ident = #deserialize_field ;
-				});
+				match generate_field(
+					&attrs.prefixes,
+					f.attrs,
+					&f.ty,
+					&mut interpretation_bounds,
+					&mut bounds,
+				)? {
+					Some(deserialize_field) => {
+						deserialize_fields.push(quote! {
+							let #ident = #deserialize_field ;
+						});
 
-				fields_constructors.push(quote!(#ident));
+						fields_constructors.push(quote!(#ident));
+					}
+					None => {
+						let ty = &f.ty;
+						fields_constructors
+							.push(quote!(#ident: <#ty as ::std::default::Default>::default()));
+					}
+				}
 			}
 
 			quote!({ #(#fields_constructors),* })
@@ -71,7 +100,7 @@ fn generate_fields(
 		deserialize_fields,
 		constructor,
 		interpretation_bounds,
-		bounds
+		bounds,
 	})
 }
 
@@ -80,8 +109,8 @@ fn generate_field(
 	attrs: Vec<syn::Attribute>,
 	ty: &syn::Type,
 	interpretation_bounds: &mut InterpretationBounds,
-	bounds: &mut Vec<syn::WherePredicate>
-) -> Result<TokenStream, Error> {
+	bounds: &mut Vec<syn::WherePredicate>,
+) -> Result<Option<TokenStream>, Error> {
 	let attrs = read_field_attributes(attrs)?;
 
 	match attrs.iri {
@@ -89,9 +118,14 @@ fn generate_field(
 			let iri = compact_iri.expand(prefixes)?.into_string();
 			interpretation_bounds.iri_mut = true;
 
-			bounds.push(syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_>)).unwrap());
+			bounds.push(
+				syn::parse2(
+					quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_>),
+				)
+				.unwrap(),
+			);
 
-			Ok(quote! {
+			Ok(Some(quote! {
 				match vocabulary_.get(unsafe { ::linked_data::iref::Iri::new_unchecked(#iri) }).and_then(|iri| interpretation_.iri_interpretation(&iri)) {
 					Some(predicate_) => {
 						::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects(
@@ -112,24 +146,29 @@ fn generate_field(
 						)?
 					}
 				}
-			})
+			}))
 		}
-		None => if attrs.is_id || attrs.flatten {
-			bounds.push(syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializeSubject<V_, I_>)).unwrap());
+		None => {
+			if attrs.is_id || attrs.flatten {
+				bounds.push(
+					syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializeSubject<V_, I_>))
+						.unwrap(),
+				);
 
-			Ok(quote! {
-				::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
-					vocabulary_,
-					interpretation_,
-					dataset_,
-					graph_,
-					resource_
-				)?
-			})
-		} else if attrs.ignore {
-			Ok(quote! {})
-		} else {
-			panic!()
+				Ok(Some(quote! {
+					::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
+						vocabulary_,
+						interpretation_,
+						dataset_,
+						graph_,
+						resource_
+					)?
+				}))
+			} else if attrs.ignore {
+				Ok(None)
+			} else {
+				panic!()
+			}
 		}
 	}
 }

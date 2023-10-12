@@ -3,9 +3,13 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{punctuated::Punctuated, spanned::Spanned};
 
-use crate::{generate::{
-	extend_generics, read_variant_attributes, TypeAttributes, VariantAttributes, VocabularyBounds, InterpretationBounds,
-}, utils::UsesGenericParam};
+use crate::{
+	generate::{
+		extend_generics, read_variant_attributes, InterpretationBounds, TypeAttributes,
+		VariantAttributes, VocabularyBounds,
+	},
+	utils::UsesGenericParam,
+};
 
 use super::{variant_compound_fields, Error};
 
@@ -148,8 +152,12 @@ pub fn generate(
 		.unwrap(),
 	);
 
-	let repr_generics =
-		extend_generics(&generics, VocabularyBounds::default(), InterpretationBounds::default(), lexical_repr_bounds);
+	let repr_generics = extend_generics(
+		&generics,
+		VocabularyBounds::default(),
+		InterpretationBounds::default(),
+		lexical_repr_bounds,
+	);
 	let subject_generics = extend_generics(
 		&generics,
 		visit_subject_vocabulary_bounds,
@@ -162,9 +170,18 @@ pub fn generate(
 		InterpretationBounds::default(),
 		visit_predicate_bounds,
 	);
-	let graph_generics =
-		extend_generics(&generics, visit_graph_vocabulary_bounds, InterpretationBounds::default(), visit_graph_bounds);
-	let dataset_generics = extend_generics(&generics, visit_ld_vocabulary_bounds, InterpretationBounds::default(), visit_ld_bounds);
+	let graph_generics = extend_generics(
+		&generics,
+		visit_graph_vocabulary_bounds,
+		InterpretationBounds::default(),
+		visit_graph_bounds,
+	);
+	let dataset_generics = extend_generics(
+		&generics,
+		visit_ld_vocabulary_bounds,
+		InterpretationBounds::default(),
+		visit_ld_bounds,
+	);
 
 	let (_, ty_generics, _) = generics.split_for_impl();
 	let (repr_impl_generics, _, repr_where_clauses) = repr_generics.split_for_impl();

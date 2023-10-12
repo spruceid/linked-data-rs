@@ -1,9 +1,9 @@
-use std::hash::Hash;
 use grdf::{Graph, GraphAccess, GraphView};
-use rdf_types::{Vocabulary, Interpretation};
+use rdf_types::{Interpretation, Vocabulary};
+use std::hash::Hash;
 
 use crate::{
-	LinkedDataResource, LinkedDataPredicateObjects, LinkedDataSubject, PredicateObjectsVisitor,
+	LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, PredicateObjectsVisitor,
 	ResourceInterpretation, SubjectVisitor,
 };
 
@@ -146,7 +146,7 @@ where
 					subject: self.subject,
 					predicate,
 					access: self.access,
-					visited: &self.visited,
+					visited: self.visited,
 				},
 			)?;
 		}
@@ -175,7 +175,7 @@ where
 						subject: self.subject,
 						predicate,
 						access: self.access,
-						visited: &self.visited,
+						visited: self.visited,
 					},
 				)?;
 			}

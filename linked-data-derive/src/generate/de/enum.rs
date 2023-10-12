@@ -1,8 +1,11 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-use super::{Error, generate_fields};
-use crate::generate::{TypeAttributes, InterpretationBounds, VocabularyBounds, extend_generics, read_variant_attributes};
+use super::{generate_fields, Error};
+use crate::generate::{
+	extend_generics, read_variant_attributes, InterpretationBounds, TypeAttributes,
+	VocabularyBounds,
+};
 
 pub fn generate(
 	attrs: &TypeAttributes,
@@ -25,8 +28,13 @@ pub fn generate(
 
 				match variant_shape(&v.fields) {
 					VariantShape::Simple(ty) => {
-						bounds.push(syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_>)).unwrap());
-						
+						bounds.push(
+							syn::parse2(
+								quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_>),
+							)
+							.unwrap(),
+						);
+
 						quote! {
 							match vocabulary_.get(unsafe { ::linked_data::iref::Iri::new_unchecked(#iri) }).and_then(|iri| interpretation_.iri_interpretation(&iri)) {
 								Some(predicate) => {
@@ -66,7 +74,7 @@ pub fn generate(
 										Some(resource_) => {
 											(|| {
 												#(#deserialize_fields)*
-												
+
 												if objects.next().is_some() {
 													Err(::linked_data::FromLinkedDataError::TooManyValues)
 												} else {
@@ -102,49 +110,47 @@ pub fn generate(
 					}
 				}
 			}
-			None => {
-				match variant_shape(&v.fields) {
-					VariantShape::Simple(_ty) => {
-						quote! {
-							let result = ::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
-								vocabulary_,
-								interpretation_,
-								dataset_,
-								graph_,
-								resource_
-							);
+			None => match variant_shape(&v.fields) {
+				VariantShape::Simple(_ty) => {
+					quote! {
+						let result = ::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
+							vocabulary_,
+							interpretation_,
+							dataset_,
+							graph_,
+							resource_
+						);
 
-							match result {
-								Ok(value) => return Ok(value),
-								Err(e) => error = e
-							}
+						match result {
+							Ok(value) => return Ok(value),
+							Err(e) => error = e
 						}
-					}
-					VariantShape::Compound => {
-						let variant_de = generate_fields(attrs, v.fields)?;
-						interpretation_bounds.add(variant_de.interpretation_bounds);
-						bounds.extend(variant_de.bounds);
-
-						let deserialize_fields = variant_de.deserialize_fields;
-						let constructor = variant_de.constructor;
-
-						quote! {
-							let result = (|| {
-								#(#deserialize_fields)*
-								Ok(Self::#v_ident #constructor)
-							})();
-
-							match result {
-								Ok(value) => return Ok(value),
-								Err(e) => error = e
-							}
-						}
-					}
-					VariantShape::Unit => {
-						panic!()
 					}
 				}
-			}
+				VariantShape::Compound => {
+					let variant_de = generate_fields(attrs, v.fields)?;
+					interpretation_bounds.add(variant_de.interpretation_bounds);
+					bounds.extend(variant_de.bounds);
+
+					let deserialize_fields = variant_de.deserialize_fields;
+					let constructor = variant_de.constructor;
+
+					quote! {
+						let result = (|| {
+							#(#deserialize_fields)*
+							Ok(Self::#v_ident #constructor)
+						})();
+
+						match result {
+							Ok(value) => return Ok(value),
+							Err(e) => error = e
+						}
+					}
+				}
+				VariantShape::Unit => {
+					panic!()
+				}
+			},
 		};
 
 		deserialize_variants.push(deserialize_variant)
@@ -170,7 +176,7 @@ pub fn generate(
 				let mut error = ::linked_data::FromLinkedDataError::InvalidSubject;
 
 				#(#deserialize_variants)*
-				
+
 				Err(error)
 			}
 		}
@@ -183,9 +189,7 @@ enum VariantShape<'a> {
 	Unit,
 }
 
-fn variant_shape(
-	fields: &syn::Fields,
-) -> VariantShape {
+fn variant_shape(fields: &syn::Fields) -> VariantShape {
 	match fields {
 		syn::Fields::Named(_) => VariantShape::Compound,
 		syn::Fields::Unnamed(unnamed_fields) => {

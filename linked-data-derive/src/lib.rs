@@ -5,8 +5,8 @@ use proc_macro::TokenStream;
 use proc_macro_error::{abort, proc_macro_error};
 use syn::DeriveInput;
 
-pub(crate) mod utils;
 mod generate;
+pub(crate) mod utils;
 
 #[proc_macro_derive(LinkedData, attributes(ld))]
 #[proc_macro_error]

@@ -1,8 +1,11 @@
 use std::hash::Hash;
 
-use grdf::{View, Dataset, DatasetAccess, Graph};
-use rdf_types::{Vocabulary, Interpretation};
-use crate::{LinkedDataSubject, LinkedDataResource, SubjectVisitor, LinkedDataPredicateObjects, PredicateObjectsVisitor, ResourceInterpretation, LinkedDataGraph, GraphVisitor};
+use crate::{
+	GraphVisitor, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource,
+	LinkedDataSubject, PredicateObjectsVisitor, ResourceInterpretation, SubjectVisitor,
+};
+use grdf::{Dataset, DatasetAccess, Graph, View};
+use rdf_types::{Interpretation, Vocabulary};
 
 impl<'a, D: ?Sized + Dataset, A: DatasetAccess<D>, V: Vocabulary, I: Interpretation>
 	LinkedDataSubject<V, I> for View<'a, D, A>
@@ -187,7 +190,7 @@ where
 						subject: self.subject,
 						predicate,
 						access: self.access,
-						visited_subjects: &self.visited_subjects,
+						visited_subjects: self.visited_subjects,
 						visited_graphs: self.visited_graphs,
 					},
 				)?;
@@ -248,8 +251,8 @@ where
 					subject: self.subject,
 					predicate,
 					access: self.access,
-					visited_subjects: &self.visited_subjects,
-					visited_graphs: &self.visited_graphs,
+					visited_subjects: self.visited_subjects,
+					visited_graphs: self.visited_graphs,
 				},
 			)?;
 		}
