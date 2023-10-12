@@ -1,33 +1,33 @@
-use linked_data::{to_quads, LinkedData, LinkedDataResource};
+use linked_data::{to_quads, Deserialize, LinkedDataResource, Serialize};
 use rdf_types::{generator, RdfDisplay};
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum Subject {
 	Name(String),
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum SubjectCompound {
 	Name(#[ld("ex:name")] String),
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum Property {
 	#[ld("ex:name")]
 	Name(String),
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum PropertyCompound {
 	#[ld("ex:name")]
 	Name(#[ld("ex:value")] String),
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 enum Ids {
 	#[ld("ex:A")]

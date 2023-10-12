@@ -1,8 +1,8 @@
 use iref::IriBuf;
-use linked_data::{to_quads, LinkedData};
+use linked_data::{to_quads, Deserialize, Serialize};
 use rdf_types::{generator, RdfDisplay};
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 struct Foo {
 	#[ld("ex:name")]
@@ -15,7 +15,7 @@ struct Foo {
 	more: MoreFoo,
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 #[ld(type = "http://example.org/Bar")]
 struct Bar {
@@ -26,7 +26,7 @@ struct Bar {
 	value: u32,
 }
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 #[ld(prefix("ex" = "http://example.org/"))]
 struct MoreFoo {
 	#[ld("ex:email")]

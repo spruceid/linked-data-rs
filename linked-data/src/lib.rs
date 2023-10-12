@@ -7,9 +7,8 @@
 //! ```
 //! use iref::IriBuf;
 //! use static_iref::iri;
-//! use linked_data::LinkedData;
 //!
-//! #[derive(LinkedData)]
+//! #[derive(linked_data::Serialize, linked_data::Deserialize)]
 //! #[ld(prefix("ex" = "http://example.org/"))]
 //! struct Foo {
 //!   #[ld(id)]
@@ -42,7 +41,7 @@
 //! ```
 use iref::Iri;
 #[cfg(feature = "derive")]
-pub use linked_data_derive::LinkedData;
+pub use linked_data_derive::{Deserialize, Serialize};
 use rdf_types::{Interpretation, Vocabulary};
 
 #[doc(hidden)]

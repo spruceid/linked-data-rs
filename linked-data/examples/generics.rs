@@ -1,8 +1,8 @@
 use iref::Iri;
-use linked_data::{LinkedData, LinkedDataResource};
+use linked_data::{Deserialize, LinkedDataResource, Serialize};
 use static_iref::iri;
 
-#[derive(LinkedData)]
+#[derive(Serialize, Deserialize)]
 enum Foo<'a> {
 	Reference(#[ld(id)] &'a Iri),
 }
