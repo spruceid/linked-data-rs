@@ -20,6 +20,7 @@ pub fn generate(
 	e: syn::DataEnum,
 ) -> Result<TokenStream, Error> {
 	let mut lexical_repr_bounds = Vec::new();
+	let mut lexical_repr_vocabulary_bounds = VocabularyBounds::default();
 	let mut lexical_repr_cases = Vec::new();
 
 	let mut visit_subject_bounds = Vec::new();
@@ -67,8 +68,13 @@ pub fn generate(
 		let variant_id = &variant.ident;
 		let input = &variant.input;
 
-		let lexical_repr_case =
-			variant_interpret(&variant, nest.as_deref(), &shape, &mut lexical_repr_bounds);
+		let lexical_repr_case = variant_interpret(
+			&variant,
+			nest.as_deref(),
+			&shape,
+			&mut lexical_repr_bounds,
+			&mut lexical_repr_vocabulary_bounds,
+		);
 
 		lexical_repr_cases.push(quote! {
 			Self::#variant_id #input => {
@@ -154,7 +160,7 @@ pub fn generate(
 
 	let repr_generics = extend_generics(
 		&generics,
-		VocabularyBounds::default(),
+		lexical_repr_vocabulary_bounds,
 		InterpretationBounds::default(),
 		lexical_repr_bounds,
 	);
@@ -294,9 +300,10 @@ fn variant_interpret(
 	nest: Option<&Iri>,
 	shape: &VariantShape,
 	bounds: &mut Vec<syn::WherePredicate>,
+	vocabulary_bounds: &mut VocabularyBounds,
 ) -> TokenStream {
-	if nest.is_some() {
-		match shape {
+	match nest {
+		Some(iri) => match shape {
 			VariantShape::Simple(_, _) => {
 				quote! {
 					::linked_data::ResourceInterpretation::Uninterpreted(None)
@@ -310,13 +317,26 @@ fn variant_interpret(
 				}
 			}
 			VariantShape::Unit => {
+				let iri_str = iri.as_str();
+				vocabulary_bounds.iri_mut = true;
 				quote! {
-					todo!()
+					::linked_data::ResourceInterpretation::Uninterpreted(Some(
+						::linked_data::CowRdfTerm::Owned(
+							::linked_data::rdf_types::Term::Id(
+								::linked_data::rdf_types::Id::Iri(
+									vocabulary.insert(unsafe {
+										::linked_data::iref::Iri::new_unchecked(
+											#iri_str
+										)
+									})
+								)
+							)
+						)
+					))
 				}
 			}
-		}
-	} else {
-		match shape {
+		},
+		None => match shape {
 			VariantShape::Simple(id, ty) => {
 				bounds.push(
 					syn::parse2(quote! {
@@ -347,7 +367,7 @@ fn variant_interpret(
 					::linked_data::ResourceInterpretation::Uninterpreted(None)
 				}
 			}
-		}
+		},
 	}
 }
 
