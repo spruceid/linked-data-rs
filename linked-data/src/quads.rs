@@ -78,6 +78,42 @@ where
 	Ok((subject, result))
 }
 
+pub fn to_interpreted_graph_quads<V: Vocabulary, I: Interpretation>(
+	vocabulary: &mut V,
+	interpretation: &mut I,
+	value: &(impl LinkedDataGraph<V, I> + LinkedDataResource<V, I>),
+) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
+where
+	I: InterpretationMut
+		+ IriInterpretationMut<V::Iri>
+		+ BlankIdInterpretationMut<V::BlankId>
+		+ LiteralInterpretationMut<V::Literal>,
+	I::Resource: Clone,
+	V: IriVocabularyMut + LiteralVocabularyMut,
+	V::Iri: Clone,
+	V::BlankId: Clone,
+	V::Value: RdfLiteralValue,
+	V::Type: RdfLiteralType<V>,
+	V::LanguageTag: Clone,
+{
+	let mut result = Vec::new();
+
+	let graph = match value.interpretation(vocabulary, interpretation) {
+		ResourceInterpretation::Interpreted(r) => r.clone(),
+		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(),
+	};
+
+	value.visit_graph(QuadGraphSerializer {
+		vocabulary,
+		interpretation,
+		domain: &mut InterpretationDomain,
+		graph: Some(&graph),
+		result: &mut result,
+	})?;
+
+	Ok((graph, result))
+}
+
 pub fn to_lexical_quads_with<V: Vocabulary, I: Interpretation>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
