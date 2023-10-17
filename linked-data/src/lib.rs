@@ -54,12 +54,16 @@ pub use rdf_types;
 pub use xsd_types;
 
 #[doc(hidden)]
+pub use json_syntax;
+
+#[doc(hidden)]
 pub use grdf;
 
 mod anonymous;
 mod datatypes;
 mod graph;
 mod r#impl;
+mod macros;
 mod predicate;
 mod quads;
 mod rdf;
