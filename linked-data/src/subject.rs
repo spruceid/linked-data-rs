@@ -1,5 +1,8 @@
 use iref::{Iri, IriBuf};
-use rdf_types::{BlankId, BlankIdBuf, Id, Interpretation, Vocabulary};
+use rdf_types::{
+	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
+	BlankId, BlankIdBuf, Id, Interpretation, ReverseIdInterpretation, Vocabulary,
+};
 
 use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
 
@@ -176,4 +179,95 @@ pub trait LinkedDataDeserializeSubject<V: Vocabulary = (), I: Interpretation = (
 			Object = I::Resource,
 			GraphLabel = I::Resource,
 		>;
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for IriBuf
+where
+	I: ReverseIriInterpretation<Iri = V::Iri>,
+{
+	fn deserialize_subject<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		_dataset: &D,
+		_graph: &D::Graph,
+		resource: &I::Resource,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		match interpretation.iris_of(resource).next() {
+			Some(i) => {
+				let iri = vocabulary.iri(i).unwrap();
+				Ok(iri.to_owned())
+			}
+			None => Err(FromLinkedDataError::InvalidSubject),
+		}
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for BlankIdBuf
+where
+	I: ReverseBlankIdInterpretation<BlankId = V::BlankId>,
+{
+	fn deserialize_subject<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		_dataset: &D,
+		_graph: &D::Graph,
+		resource: &I::Resource,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		match interpretation.blank_ids_of(resource).next() {
+			Some(b) => {
+				let blank_id = vocabulary.blank_id(b).unwrap();
+				Ok(blank_id.to_owned())
+			}
+			None => Err(FromLinkedDataError::InvalidSubject),
+		}
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for Id
+where
+	I: ReverseIdInterpretation<Iri = V::Iri, BlankId = V::BlankId>,
+{
+	fn deserialize_subject<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		_dataset: &D,
+		_graph: &D::Graph,
+		resource: &I::Resource,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		match interpretation.ids_of(resource).next() {
+			Some(Id::Iri(i)) => {
+				let iri = vocabulary.iri(i).unwrap();
+				Ok(Id::Iri(iri.to_owned()))
+			}
+			Some(Id::Blank(b)) => {
+				let blank_id = vocabulary.blank_id(b).unwrap();
+				Ok(Id::Blank(blank_id.to_owned()))
+			}
+			None => Err(FromLinkedDataError::InvalidSubject),
+		}
+	}
 }
