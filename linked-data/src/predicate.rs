@@ -5,7 +5,9 @@ use rdf_types::{
 	ReverseIdInterpretation, Vocabulary,
 };
 
-use crate::{FromLinkedDataError, LinkedDataResource, LinkedDataSubject};
+use crate::{
+	FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject,
+};
 
 /// Type representing the objects of an RDF subject's predicate binding.
 pub trait LinkedDataPredicateObjects<V: Vocabulary = (), I: Interpretation = ()> {
@@ -270,5 +272,39 @@ impl<V: Vocabulary, I: Interpretation, T: LinkedDataDeserializePredicateObjects<
 		>,
 	{
 		T::deserialize_objects(vocabulary, interpretation, dataset, graph, objects).map(Box::new)
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, T: LinkedDataDeserializeSubject<V, I>>
+	LinkedDataDeserializePredicateObjects<V, I> for Option<T>
+{
+	fn deserialize_objects<'a, D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		objects: impl IntoIterator<Item = &'a I::Resource>,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		I::Resource: 'a,
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		let mut objects = objects.into_iter();
+		match objects.next() {
+			Some(object) => {
+				if objects.next().is_none() {
+					T::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+						.map(Some)
+				} else {
+					Err(FromLinkedDataError::TooManyValues)
+				}
+			}
+			None => Ok(None),
+		}
 	}
 }
