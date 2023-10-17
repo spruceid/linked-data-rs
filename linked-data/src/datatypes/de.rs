@@ -8,7 +8,7 @@ use crate::{
 };
 
 macro_rules! deserialize_datatype {
-	($($ty:ident : $iri:ident),*) => {
+	($($ty:ty : $iri:ident),*) => {
 		$(
 			impl<V: Vocabulary, I: ReverseLiteralInterpretation<Literal = V::Literal>> LinkedDataDeserializeSubject<V, I> for $ty
 			where
@@ -95,5 +95,6 @@ deserialize_datatype!(
 	i16: XSD_SHORT,
 	i32: XSD_INT,
 	i64: XSD_LONG,
-	String: XSD_STRING
+	String: XSD_STRING,
+	xsd_types::DateTime: XSD_DATE_TIME
 );
