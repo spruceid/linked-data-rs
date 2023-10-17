@@ -271,3 +271,25 @@ where
 		}
 	}
 }
+
+impl<V: Vocabulary, I: Interpretation, T: LinkedDataDeserializeSubject<V, I>>
+	LinkedDataDeserializeSubject<V, I> for Box<T>
+{
+	fn deserialize_subject<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		resource: &I::Resource,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		T::deserialize_subject(vocabulary, interpretation, dataset, graph, resource).map(Box::new)
+	}
+}

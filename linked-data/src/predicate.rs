@@ -1,6 +1,8 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{
-	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut, Vocabulary,
+	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
+	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut,
+	ReverseIdInterpretation, Vocabulary,
 };
 
 use crate::{FromLinkedDataError, LinkedDataResource, LinkedDataSubject};
@@ -185,4 +187,88 @@ pub trait LinkedDataDeserializePredicateObjects<V: Vocabulary = (), I: Interpret
 			Object = I::Resource,
 			GraphLabel = I::Resource,
 		>;
+}
+
+macro_rules! deserialize_single_object {
+	() => {
+		fn deserialize_objects<'a, D>(
+			vocabulary: &V,
+			interpretation: &I,
+			dataset: &D,
+			graph: &D::Graph,
+			objects: impl IntoIterator<Item = &'a I::Resource>,
+		) -> Result<Self, FromLinkedDataError>
+		where
+			I::Resource: 'a,
+			D: grdf::Dataset<
+				Subject = I::Resource,
+				Predicate = I::Resource,
+				Object = I::Resource,
+				GraphLabel = I::Resource,
+			>,
+		{
+			use crate::LinkedDataDeserializeSubject;
+			let mut objects = objects.into_iter();
+			match objects.next() {
+				Some(object) => {
+					if objects.next().is_none() {
+						Self::deserialize_subject(
+							vocabulary,
+							interpretation,
+							dataset,
+							graph,
+							object,
+						)
+					} else {
+						Err(FromLinkedDataError::TooManyValues)
+					}
+				}
+				None => Err(FromLinkedDataError::MissingRequiredValue),
+			}
+		}
+	};
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<V, I> for IriBuf
+where
+	I: ReverseIriInterpretation<Iri = V::Iri>,
+{
+	deserialize_single_object!();
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<V, I> for BlankIdBuf
+where
+	I: ReverseBlankIdInterpretation<BlankId = V::BlankId>,
+{
+	deserialize_single_object!();
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<V, I> for Id
+where
+	I: ReverseIdInterpretation<Iri = V::Iri, BlankId = V::BlankId>,
+{
+	deserialize_single_object!();
+}
+
+impl<V: Vocabulary, I: Interpretation, T: LinkedDataDeserializePredicateObjects<V, I>>
+	LinkedDataDeserializePredicateObjects<V, I> for Box<T>
+{
+	fn deserialize_objects<'a, D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		objects: impl IntoIterator<Item = &'a I::Resource>,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		I::Resource: 'a,
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>,
+	{
+		T::deserialize_objects(vocabulary, interpretation, dataset, graph, objects).map(Box::new)
+	}
 }
