@@ -20,7 +20,7 @@ pub fn to_interpreted_quads<V: Vocabulary, I: Interpretation>(
 	value: &impl LinkedData<V, I>,
 ) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
-	I: InterpretationMut
+	I: InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
@@ -47,7 +47,7 @@ pub fn to_interpreted_subject_quads<V: Vocabulary, I: Interpretation>(
 	value: &(impl LinkedDataSubject<V, I> + LinkedDataResource<V, I>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut
+	I: InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
@@ -63,7 +63,7 @@ where
 
 	let subject = match value.interpretation(vocabulary, interpretation) {
 		ResourceInterpretation::Interpreted(r) => r.clone(),
-		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(),
+		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(vocabulary),
 	};
 
 	value.visit_subject(QuadPropertiesSerializer {
@@ -84,7 +84,7 @@ pub fn to_interpreted_graph_quads<V: Vocabulary, I: Interpretation>(
 	value: &(impl LinkedDataGraph<V, I> + LinkedDataResource<V, I>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut
+	I: InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
@@ -100,7 +100,7 @@ where
 
 	let graph = match value.interpretation(vocabulary, interpretation) {
 		ResourceInterpretation::Interpreted(r) => r.clone(),
-		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(),
+		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(vocabulary),
 	};
 
 	value.visit_graph(QuadGraphSerializer {
@@ -457,7 +457,7 @@ struct InterpretationDomain;
 
 impl<V: Vocabulary, I: Interpretation> Domain<V, I> for InterpretationDomain
 where
-	I: InterpretationMut
+	I: InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
@@ -476,7 +476,7 @@ where
 
 	fn subject(
 		&mut self,
-		_vocabulary: &mut V,
+		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
 	) -> Result<Self::Subject, IntoQuadsError> {
@@ -497,7 +497,7 @@ where
 				}
 				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(IntoQuadsError::Subject),
 				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(IntoQuadsError::Subject),
-				None => Ok(interpretation.new_resource()),
+				None => Ok(interpretation.new_resource(vocabulary)),
 			},
 		}
 	}
@@ -553,14 +553,14 @@ where
 					let l = interpretation.interpret_literal(l);
 					Ok(l)
 				}
-				None => Ok(interpretation.new_resource()),
+				None => Ok(interpretation.new_resource(vocabulary)),
 			},
 		}
 	}
 
 	fn graph(
 		&mut self,
-		_vocabulary: &mut V,
+		vocabulary: &mut V,
 		interpretation: &mut I,
 		value: ResourceInterpretation<V, I>,
 	) -> Result<Self::Subject, IntoQuadsError> {
@@ -581,7 +581,7 @@ where
 				}
 				Some(CowRdfTerm::Owned(Term::Literal(_))) => Err(IntoQuadsError::Graph),
 				Some(CowRdfTerm::Borrowed(Term::Literal(_))) => Err(IntoQuadsError::Graph),
-				None => Ok(interpretation.new_resource()),
+				None => Ok(interpretation.new_resource(vocabulary)),
 			},
 		}
 	}

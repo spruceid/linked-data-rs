@@ -8,10 +8,10 @@ default = ["derive", "serde"]
 derive = ["linked-data-derive"]
 
 [dependencies]
-rdf-types = "0.16.1"
+rdf-types = "0.17"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
-grdf = { git = "https://github.com/timothee-haudebourg/grdf.git" }
+grdf = "0.21"
 static-iref = "3.0"
 json-syntax = "0.9.5"
 iref.workspace = true
