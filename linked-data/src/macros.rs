@@ -1,12 +1,12 @@
 #[macro_export]
 macro_rules! json_literal {
 	($ty:ty) => {
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataResource<V, I> for $ty {
+		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataResource<I, V> for $ty {
 			fn interpretation(
 				&self,
 				_vocabulary: &mut V,
 				_interpretation: &mut I,
-			) -> $crate::ResourceInterpretation<V, I> {
+			) -> $crate::ResourceInterpretation<I, V> {
 				use $crate::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
 
 				let mut value = $crate::json_syntax::to_value(self).unwrap();
@@ -18,17 +18,17 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataPredicateObjects<V, I> for $ty {
+		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataPredicateObjects<I, V> for $ty {
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: $crate::PredicateObjectsVisitor<V, I>,
+				S: $crate::PredicateObjectsVisitor<I, V>,
 			{
 				visitor.object(self)?;
 				visitor.end()
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializePredicateObjects<V, I> for $ty
+		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializePredicateObjects<I, V> for $ty
 		where
 			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
 			V::Value: AsRef<str>,
@@ -54,7 +54,7 @@ macro_rules! json_literal {
 				match objects.next() {
 					Some(object) => {
 						if objects.next().is_none() {
-							<Self as $crate::LinkedDataDeserializeSubject<V, I>>::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+							<Self as $crate::LinkedDataDeserializeSubject<I, V>>::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
 						} else {
 							Err($crate::FromLinkedDataError::TooManyValues)
 						}
@@ -66,16 +66,16 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataSubject<V, I> for $ty {
+		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataSubject<I, V> for $ty {
 			fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 			where
-				S: $crate::SubjectVisitor<V, I>,
+				S: $crate::SubjectVisitor<I, V>,
 			{
 				visitor.end()
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializeSubject<V, I> for $ty
+		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializeSubject<I, V> for $ty
 		where
 			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
 			V::Value: AsRef<str>,
