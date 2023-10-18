@@ -175,7 +175,7 @@ fn extend_generics(
 
 	result.params.push(syn::GenericParam::Type(syn::TypeParam {
 		attrs: Vec::new(),
-		ident: format_ident!("V_"),
+		ident: format_ident!("I_"),
 		colon_token: None,
 		bounds: Punctuated::new(),
 		eq_token: None,
@@ -184,7 +184,7 @@ fn extend_generics(
 
 	result.params.push(syn::GenericParam::Type(syn::TypeParam {
 		attrs: Vec::new(),
-		ident: format_ident!("I_"),
+		ident: format_ident!("V_"),
 		colon_token: None,
 		bounds: Punctuated::new(),
 		eq_token: None,
@@ -193,14 +193,14 @@ fn extend_generics(
 
 	bounds.push(
 		syn::parse2(quote! {
-			V_: #vocabulary_bounds
+			I_: #interpertation_bounds
 		})
 		.unwrap(),
 	);
 
 	bounds.push(
 		syn::parse2(quote! {
-			I_: #interpertation_bounds
+			V_: #vocabulary_bounds
 		})
 		.unwrap(),
 	);

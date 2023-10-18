@@ -115,44 +115,44 @@ pub enum FromLinkedDataError {
 ///
 /// A Linked-Data type represents an RDF dataset which can be visited using the
 /// [`visit`](Self::visit) method.
-pub trait LinkedData<V: Vocabulary = (), I: Interpretation = ()> {
+pub trait LinkedData<I: Interpretation = (), V: Vocabulary = ()> {
 	/// Visit the RDF dataset represented by this type.
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: Visitor<V, I>;
+		S: Visitor<I, V>;
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedData<V, I>> LinkedData<V, I>
+impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedData<I, V>> LinkedData<I, V>
 	for &'a T
 {
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: Visitor<V, I>,
+		S: Visitor<I, V>,
 	{
 		T::visit(self, visitor)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedData<V, I>> LinkedData<V, I> for Box<T> {
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedData<I, V>> LinkedData<I, V> for Box<T> {
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: Visitor<V, I>,
+		S: Visitor<I, V>,
 	{
 		T::visit(self, visitor)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Iri {
+impl<I: Interpretation, V: Vocabulary> LinkedData<I, V> for Iri {
 	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: Visitor<V, I>,
+		S: Visitor<I, V>,
 	{
 		visitor.end()
 	}
 }
 
 /// RDF dataset visitor.
-pub trait Visitor<V: Vocabulary, I: Interpretation> {
+pub trait Visitor<I: Interpretation = (), V: Vocabulary = ()> {
 	/// Type of the value returned by the visitor when the dataset has been
 	/// entirely visited.
 	type Ok;
@@ -163,32 +163,32 @@ pub trait Visitor<V: Vocabulary, I: Interpretation> {
 	/// Visits the default graph of the dataset.
 	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataGraph<V, I>;
+		T: ?Sized + LinkedDataGraph<I, V>;
 
 	/// Visits a named graph of the dataset.
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataGraph<V, I>;
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataGraph<I, V>;
 
 	/// Ends the dataset visit.
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
 /// Any mutable reference to a visitor is itself a visitor.
-impl<'s, V: Vocabulary, I: Interpretation, S: Visitor<V, I>> Visitor<V, I> for &'s mut S {
+impl<'s, I: Interpretation, V: Vocabulary, S: Visitor<I, V>> Visitor<I, V> for &'s mut S {
 	type Ok = ();
 	type Error = S::Error;
 
 	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataGraph<I, V>,
 	{
 		S::default_graph(self, value)
 	}
 
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataGraph<I, V>,
 	{
 		S::named_graph(self, value)
 	}

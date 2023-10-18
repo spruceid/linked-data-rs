@@ -24,7 +24,7 @@ pub fn generate(
 	let (impl_generics, _, where_clause) = ld_generics.split_for_impl();
 
 	Ok(quote! {
-		impl #impl_generics ::linked_data::LinkedDataDeserializeSubject<V_, I_> for #ident #ty_generics #where_clause {
+		impl #impl_generics ::linked_data::LinkedDataDeserializeSubject<I_, V_> for #ident #ty_generics #where_clause {
 			fn deserialize_subject<D_>(
 				vocabulary_: &V_,
 				interpretation_: &I_,
@@ -40,7 +40,7 @@ pub fn generate(
 			}
 		}
 
-		impl #impl_generics ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_> for #ident #ty_generics #where_clause {
+		impl #impl_generics ::linked_data::LinkedDataDeserializePredicateObjects<I_, V_> for #ident #ty_generics #where_clause {
 			fn deserialize_objects<'de_, D_>(
 				vocabulary: &V_,
 				interpretation: &I_,
@@ -56,7 +56,7 @@ pub fn generate(
 
 				match objects.next() {
 					Some(object) => {
-						let value = <Self as ::linked_data::LinkedDataDeserializeSubject<V_, I_>>::deserialize_subject(
+						let value = <Self as ::linked_data::LinkedDataDeserializeSubject<I_, V_>>::deserialize_subject(
 							vocabulary,
 							interpretation,
 							dataset,

@@ -8,7 +8,7 @@ use crate::{
 macro_rules! datatype {
 	($($ty:ty : $variant:ident),*) => {
 		$(
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
@@ -16,32 +16,32 @@ macro_rules! datatype {
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
-				) -> ResourceInterpretation<V, I> {
+				) -> ResourceInterpretation<I, V> {
 					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Xsd(
 						xsd_types::Value::$variant(self.clone())
 					)))))
 				}
 			}
 
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
 				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 				where
-					S: crate::SubjectVisitor<V, I>
+					S: crate::SubjectVisitor<I, V>
 				{
 					visitor.end()
 				}
 			}
 
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
 				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 				where
-					S: PredicateObjectsVisitor<V, I>,
+					S: PredicateObjectsVisitor<I, V>,
 				{
 					visitor.object(self)?;
 					visitor.end()
@@ -54,7 +54,7 @@ macro_rules! datatype {
 macro_rules! unsized_datatype {
 	($($ty:ty : $variant:ident),*) => {
 		$(
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataResource<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
@@ -62,32 +62,32 @@ macro_rules! unsized_datatype {
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
-				) -> ResourceInterpretation<V, I> {
+				) -> ResourceInterpretation<I, V> {
 					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(RdfLiteralRef::Xsd(
 						xsd_types::ValueRef::$variant(self)
 					)))))
 				}
 			}
 
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
 				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 				where
-					S: crate::SubjectVisitor<V, I>
+					S: crate::SubjectVisitor<I, V>
 				{
 					visitor.end()
 				}
 			}
 
-			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<V, I> for $ty
+			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<I, V> for $ty
 			where
 				V::Value: From<String>
 			{
 				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 				where
-					S: PredicateObjectsVisitor<V, I>,
+					S: PredicateObjectsVisitor<I, V>,
 				{
 					visitor.object(self)?;
 					visitor.end()
@@ -115,7 +115,7 @@ unsized_datatype! {
 }
 
 impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
-	LinkedDataResource<V, I> for xsd_types::AnyUriBuf
+	LinkedDataResource<I, V> for xsd_types::AnyUriBuf
 where
 	V::Value: From<String>,
 {
@@ -123,7 +123,7 @@ where
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> ResourceInterpretation<V, I> {
+	) -> ResourceInterpretation<I, V> {
 		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
 			RdfLiteral::Xsd(xsd_types::Value::AnyUri(self.clone())),
 		))))
@@ -133,7 +133,7 @@ where
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> ResourceInterpretation<V, I> {
+	) -> ResourceInterpretation<I, V> {
 		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Id(Id::Iri(
 			vocabulary.insert(self.as_iri()),
 		)))))
@@ -141,26 +141,26 @@ where
 }
 
 impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
-	LinkedDataSubject<V, I> for xsd_types::AnyUriBuf
+	LinkedDataSubject<I, V> for xsd_types::AnyUriBuf
 where
 	V::Value: From<String>,
 {
 	fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::SubjectVisitor<V, I>,
+		S: crate::SubjectVisitor<I, V>,
 	{
 		visitor.end()
 	}
 }
 
 impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
-	LinkedDataPredicateObjects<V, I> for xsd_types::AnyUriBuf
+	LinkedDataPredicateObjects<I, V> for xsd_types::AnyUriBuf
 where
 	V::Value: From<String>,
 {
 	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: PredicateObjectsVisitor<V, I>,
+		S: PredicateObjectsVisitor<I, V>,
 	{
 		visitor.object(self)?;
 		visitor.end()

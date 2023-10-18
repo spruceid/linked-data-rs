@@ -1,11 +1,11 @@
 use educe::Educe;
 use iref::IriBuf;
 use rdf_types::{
-	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankIdInterpretationMut, BlankIdVocabulary, ExportedFromVocabulary, Generator, Id,
-	InsertIntoVocabulary, Interpretation, InterpretationMut, IriInterpretationMut, IriVocabulary,
+	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation, self},
+	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id,
+	InsertIntoVocabulary, Interpretation, InterpretationMut, IriInterpretationMut,
 	IriVocabularyMut, LiteralInterpretationMut, LiteralVocabularyMut, Quad,
-	ReverseLiteralInterpretation, Term, Vocabulary,
+	ReverseLiteralInterpretation, ReverseTermInterpretation, Term, Vocabulary,
 };
 
 use crate::{
@@ -14,10 +14,10 @@ use crate::{
 	ResourceInterpretation, SubjectVisitor, Visitor,
 };
 
-pub fn to_interpreted_quads<V: Vocabulary, I: Interpretation>(
+pub fn to_interpreted_quads<I: Interpretation, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
-	value: &impl LinkedData<V, I>,
+	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
 	I: InterpretationMut<V>
@@ -40,11 +40,11 @@ where
 	})
 }
 
-pub fn to_interpreted_subject_quads<V: Vocabulary, I: Interpretation>(
+pub fn to_interpreted_subject_quads<I: Interpretation, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&I::Resource>,
-	value: &(impl LinkedDataSubject<V, I> + LinkedDataResource<V, I>),
+	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
 	I: InterpretationMut<V>
@@ -78,10 +78,10 @@ where
 	Ok((subject, result))
 }
 
-pub fn to_interpreted_graph_quads<V: Vocabulary, I: Interpretation>(
+pub fn to_interpreted_graph_quads<I: Interpretation, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
-	value: &(impl LinkedDataGraph<V, I> + LinkedDataResource<V, I>),
+	value: &(impl LinkedDataGraph<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
 	I: InterpretationMut<V>
@@ -114,19 +114,19 @@ where
 	Ok((graph, result))
 }
 
-pub fn to_lexical_quads_with<V: Vocabulary, I: Interpretation>(
+pub fn to_lexical_quads_with<I: Interpretation, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
-	generator: impl Generator<V>,
-	value: &impl LinkedData<V, I>,
+	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<Quad>, IntoQuadsError>
 where
-	I: ReverseIriInterpretation<Iri = V::Iri>
+	I: InterpretationMut<V>
+		+ ReverseIriInterpretation<Iri = V::Iri>
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
 		+ ReverseLiteralInterpretation<Literal = V::Literal>,
 	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
 {
-	let mut domain = LexicalDomain { generator };
+	let mut domain = LexicalDomain;
 
 	value.visit(QuadSerializer {
 		vocabulary,
@@ -136,18 +136,18 @@ where
 	})
 }
 
-pub fn to_lexical_quads(
-	generator: impl Generator<()>,
-	value: &impl LinkedData,
+pub fn to_lexical_quads<G: Generator>(
+	generator: G,
+	value: &impl LinkedData<interpretation::WithGenerator<G>>,
 ) -> Result<Vec<Quad>, IntoQuadsError> {
-	to_lexical_quads_with(&mut (), &mut (), generator, value)
+	let mut interpretation = rdf_types::interpretation::WithGenerator::new((), generator);
+	to_lexical_quads_with(&mut (), &mut interpretation, value)
 }
 
-pub fn to_quads_with<V: Vocabulary, I: Interpretation>(
+pub fn to_quads_with<I: InterpretationMut<V>, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
-	generator: impl Generator<V>,
-	value: &impl LinkedData<V, I>,
+	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<RdfQuad<V>>, IntoQuadsError>
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
@@ -161,7 +161,7 @@ where
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
 		+ ReverseLiteralInterpretation<Literal = V::Literal>,
 {
-	let mut domain = VocabularyDomain { generator };
+	let mut domain = VocabularyDomain;
 
 	value.visit(QuadSerializer {
 		vocabulary,
@@ -171,18 +171,12 @@ where
 	})
 }
 
-pub fn to_quads(
-	generator: impl Generator<()>,
-	value: &impl LinkedData,
+pub fn to_quads<G: Generator>(
+	generator: G,
+	value: &impl LinkedData<interpretation::WithGenerator<G>>,
 ) -> Result<Vec<Quad>, IntoQuadsError> {
-	let mut domain = VocabularyDomain { generator };
-
-	value.visit(QuadSerializer {
-		vocabulary: &mut (),
-		interpretation: &mut (),
-		domain: &mut domain,
-		result: Vec::new(),
-	})
+	let mut interpretation = interpretation::WithGenerator::new((), generator);
+	to_quads_with(&mut (), &mut interpretation, value)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -195,9 +189,12 @@ pub enum IntoQuadsError {
 
 	#[error("invalid predicate")]
 	Predicate,
+
+	#[error("missing lexical representation")]
+	MissingLexicalRepresentation,
 }
 
-trait Domain<V: Vocabulary, I: Interpretation> {
+trait Domain<I: Interpretation, V: Vocabulary> {
 	type Subject: Clone;
 	type Predicate: Clone;
 	type Object;
@@ -212,28 +209,28 @@ trait Domain<V: Vocabulary, I: Interpretation> {
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError>;
 
 	fn predicate(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Predicate, IntoQuadsError>;
 
 	fn object(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Object, IntoQuadsError>;
 
 	fn graph(
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError>;
 
 	fn object_as_subject<'a>(
@@ -266,18 +263,41 @@ trait Domain<V: Vocabulary, I: Interpretation> {
 		I::Resource: 'a;
 }
 
-type DomainQuad<V, I, D> = Quad<
-	<D as Domain<V, I>>::Subject,
-	<D as Domain<V, I>>::Predicate,
-	<D as Domain<V, I>>::Object,
-	<D as Domain<V, I>>::Subject,
+type DomainQuad<I, V, D> = Quad<
+	<D as Domain<I, V>>::Subject,
+	<D as Domain<I, V>>::Predicate,
+	<D as Domain<I, V>>::Object,
+	<D as Domain<I, V>>::Subject,
 >;
 
-struct VocabularyDomain<G> {
-	generator: G,
+struct VocabularyDomain;
+
+fn resource_term<I>(
+	interpretation: &I,
+	r: &I::Resource,
+) -> Result<Term<Id<I::Iri, I::BlankId>, I::Literal>, IntoQuadsError>
+where
+	I: ReverseTermInterpretation,
+	I::Iri: Clone,
+	I::BlankId: Clone,
+	I::Literal: Clone
+{
+	if let Some(iri) = interpretation.iris_of(r).next() {
+		return Ok(Term::Id(Id::Iri(iri.clone())));
+	}
+
+	if let Some(lit) = interpretation.literals_of(r).next() {
+		return Ok(Term::Literal(lit.clone()));
+	}
+
+	if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
+		return Ok(Term::Id(Id::Blank(blank_id.clone())));
+	}
+
+	Err(IntoQuadsError::MissingLexicalRepresentation)
 }
 
-impl<V: Vocabulary, I: Interpretation, G: Generator<V>> Domain<V, I> for VocabularyDomain<G>
+impl<I: InterpretationMut<V>, V: Vocabulary> Domain<I, V> for VocabularyDomain
 where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
@@ -299,7 +319,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -311,13 +331,17 @@ where
 					return Ok(Id::Blank(blank_id.clone()));
 				}
 
-				Ok(self.generator.next(vocabulary))
+				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
-			ResourceInterpretation::Uninterpreted(u) => u
-				.map(|t| t.into_owned())
-				.unwrap_or_else(|| Term::Id(self.generator.next(vocabulary)))
-				.into_id()
-				.ok_or(IntoQuadsError::Subject),
+			ResourceInterpretation::Uninterpreted(u) => {
+				match u {
+					Some(u) => u.into_owned().into_id(),
+					None => {
+						let r = interpretation.new_resource(vocabulary);
+						resource_term(interpretation, &r)?.into_id()
+					}
+				}.ok_or(IntoQuadsError::Subject)
+			}
 		}
 	}
 
@@ -325,7 +349,7 @@ where
 		&mut self,
 		_vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Predicate, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -347,23 +371,11 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(r).next() {
-					return Ok(Term::Id(Id::Iri(iri.clone())));
-				}
-
-				if let Some(lit) = interpretation.literals_of(r).next() {
-					return Ok(Term::Literal(lit.clone()));
-				}
-
-				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
-					return Ok(Term::Id(Id::Blank(blank_id.clone())));
-				}
-
-				Ok(Term::Id(self.generator.next(vocabulary)))
+				resource_term(interpretation, r)
 			}
 			ResourceInterpretation::Uninterpreted(u) => {
 				let term = match u {
@@ -375,7 +387,10 @@ where
 					Some(CowRdfTerm::Borrowed(Term::Literal(l))) => {
 						Term::Literal(l.into_owned().insert_into_vocabulary(vocabulary))
 					}
-					None => Term::Id(self.generator.next(vocabulary)),
+					None => {
+						let r = interpretation.new_resource(vocabulary);
+						resource_term(interpretation, &r)?
+					},
 				};
 
 				Ok(term)
@@ -387,7 +402,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -399,13 +414,17 @@ where
 					return Ok(Id::Blank(blank_id.clone()));
 				}
 
-				Ok(self.generator.next(vocabulary))
+				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
-			ResourceInterpretation::Uninterpreted(u) => u
-				.map(CowRdfTerm::into_owned)
-				.unwrap_or_else(|| Term::Id(self.generator.next(vocabulary)))
-				.into_id()
-				.ok_or(IntoQuadsError::Graph),
+			ResourceInterpretation::Uninterpreted(u) => {
+				match u {
+					Some(u) => u.into_owned().into_id(),
+					None => {
+						let r = interpretation.new_resource(vocabulary);
+						resource_term(interpretation, &r)?.into_id()
+					}
+				}.ok_or(IntoQuadsError::Subject)
+			}
 		}
 	}
 
@@ -455,7 +474,7 @@ where
 
 struct InterpretationDomain;
 
-impl<V: Vocabulary, I: Interpretation> Domain<V, I> for InterpretationDomain
+impl<I: Interpretation, V: Vocabulary> Domain<I, V> for InterpretationDomain
 where
 	I: InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
@@ -478,7 +497,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
@@ -506,7 +525,7 @@ where
 		&mut self,
 		_vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Predicate, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
@@ -526,7 +545,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
@@ -562,7 +581,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => Ok(r.clone()),
@@ -627,9 +646,7 @@ where
 	}
 }
 
-struct LexicalDomain<G> {
-	generator: G,
-}
+struct LexicalDomain;
 
 fn lexical_term<V: Vocabulary>(vocabulary: &V, term: CowRdfTerm<V>) -> Term {
 	match term {
@@ -650,17 +667,33 @@ fn lexical_term<V: Vocabulary>(vocabulary: &V, term: CowRdfTerm<V>) -> Term {
 	}
 }
 
-fn next_lexical_id<V: IriVocabulary + BlankIdVocabulary>(
-	vocabulary: &mut V,
-	mut generator: impl Generator<V>,
-) -> Id {
-	match generator.next(vocabulary) {
-		Id::Iri(i) => Id::Iri(vocabulary.iri(&i).unwrap().to_owned()),
-		Id::Blank(b) => Id::Blank(vocabulary.blank_id(&b).unwrap().to_owned()),
+fn resource_lexical_term<V: Vocabulary, I>(
+	vocabulary: &V,
+	interpretation: &I,
+	r: &I::Resource,
+) -> Result<Term<Id, rdf_types::Literal>, IntoQuadsError>
+where
+	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+{
+	if let Some(iri) = interpretation.iris_of(r).next() {
+		let iri = vocabulary.iri(iri).unwrap();
+		return Ok(Term::Id(Id::Iri(iri.to_owned())));
 	}
+
+	if let Some(lit) = interpretation.literals_of(r).next() {
+		return Ok(Term::Literal(lit.exported_from_vocabulary(vocabulary)));
+	}
+
+	if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
+		let blank_id = vocabulary.blank_id(blank_id).unwrap();
+		return Ok(Term::Id(Id::Blank(blank_id.to_owned())));
+	}
+
+	Err(IntoQuadsError::MissingLexicalRepresentation)
 }
 
-impl<V: Vocabulary, I: Interpretation, G: Generator<V>> Domain<V, I> for LexicalDomain<G>
+impl<I: InterpretationMut<V>, V: Vocabulary> Domain<I, V> for LexicalDomain
 where
 	I: ReverseIriInterpretation<Iri = V::Iri>
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -676,7 +709,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -690,11 +723,14 @@ where
 					return Ok(Id::Blank(blank_id.to_owned()));
 				}
 
-				Ok(next_lexical_id(vocabulary, &mut self.generator))
+				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
 			ResourceInterpretation::Uninterpreted(u) => u
-				.map(|t| lexical_term(vocabulary, t))
-				.unwrap_or_else(|| Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
+				.map(|t| Ok(lexical_term(vocabulary, t)))
+				.unwrap_or_else(|| {
+					let r = interpretation.new_resource(vocabulary);
+					resource_lexical_term(vocabulary, interpretation, &r)
+				})?
 				.into_id()
 				.ok_or(IntoQuadsError::Subject),
 		}
@@ -704,7 +740,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Predicate, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -731,25 +767,11 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
-				if let Some(iri) = interpretation.iris_of(r).next() {
-					let iri = vocabulary.iri(iri).unwrap();
-					return Ok(Term::Id(Id::Iri(iri.to_owned())));
-				}
-
-				if let Some(lit) = interpretation.literals_of(r).next() {
-					return Ok(Term::Literal(lit.exported_from_vocabulary(vocabulary)));
-				}
-
-				if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
-					let blank_id = vocabulary.blank_id(blank_id).unwrap();
-					return Ok(Term::Id(Id::Blank(blank_id.to_owned())));
-				}
-
-				Ok(Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
+				resource_lexical_term(vocabulary, interpretation, r)
 			}
 			ResourceInterpretation::Uninterpreted(u) => {
 				let term = match u {
@@ -771,7 +793,10 @@ where
 					Some(CowRdfTerm::Borrowed(Term::Literal(lit))) => {
 						Term::Literal(lit.into_lexical(vocabulary))
 					}
-					None => Term::Id(next_lexical_id(vocabulary, &mut self.generator)),
+					None => {
+						let r = interpretation.new_resource(vocabulary);
+						resource_lexical_term(vocabulary, interpretation, &r)?
+					}
 				};
 
 				Ok(term)
@@ -783,7 +808,7 @@ where
 		&mut self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-		value: ResourceInterpretation<V, I>,
+		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Subject, IntoQuadsError> {
 		match value {
 			ResourceInterpretation::Interpreted(r) => {
@@ -797,11 +822,14 @@ where
 					return Ok(Id::Blank(blank_id.to_owned()));
 				}
 
-				Ok(next_lexical_id(vocabulary, &mut self.generator))
+				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
 			ResourceInterpretation::Uninterpreted(u) => u
-				.map(|t| lexical_term(vocabulary, t))
-				.unwrap_or_else(|| Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
+				.map(|t| Ok(lexical_term(vocabulary, t)))
+				.unwrap_or_else(|| {
+					let r = interpretation.new_resource(vocabulary);
+					resource_lexical_term(vocabulary, interpretation, &r)
+				})?
 				.into_id()
 				.ok_or(IntoQuadsError::Graph),
 		}
@@ -852,22 +880,22 @@ where
 }
 
 /// A simple serializer generating a list of `Quad`s.
-struct QuadSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+struct QuadSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	vocabulary: &'a mut V,
 	interpretation: &'a mut I,
 	domain: &'a mut D,
-	result: Vec<DomainQuad<V, I, D>>,
+	result: Vec<DomainQuad<I, V, D>>,
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
-	for QuadSerializer<'a, V, I, D>
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> Visitor<I, V>
+	for QuadSerializer<'a, I, V, D>
 {
-	type Ok = Vec<DomainQuad<V, I, D>>;
+	type Ok = Vec<DomainQuad<I, V, D>>;
 	type Error = IntoQuadsError;
 
 	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + crate::LinkedDataGraph<V, I>,
+		T: ?Sized + crate::LinkedDataGraph<I, V>,
 	{
 		let graph_serializer = QuadGraphSerializer {
 			vocabulary: self.vocabulary,
@@ -882,7 +910,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
 
 	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataGraph<I, V>,
 	{
 		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let graph = self.domain.graph(self.vocabulary, self.interpretation, i)?;
@@ -903,23 +931,23 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> Visitor<V, I>
 	}
 }
 
-struct QuadGraphSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+struct QuadGraphSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	vocabulary: &'a mut V,
 	interpretation: &'a mut I,
 	domain: &'a mut D,
-	result: &'a mut Vec<DomainQuad<V, I, D>>,
+	result: &'a mut Vec<DomainQuad<I, V, D>>,
 	graph: Option<&'a D::Subject>,
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> GraphVisitor<V, I>
-	for QuadGraphSerializer<'a, V, I, D>
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> GraphVisitor<I, V>
+	for QuadGraphSerializer<'a, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
 		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let term = self
@@ -943,23 +971,23 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> GraphVisitor<V, I>
 	}
 }
 
-struct QuadPropertiesSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+struct QuadPropertiesSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	vocabulary: &'a mut V,
 	interpretation: &'a mut I,
 	domain: &'a mut D,
-	result: &'a mut Vec<DomainQuad<V, I, D>>,
+	result: &'a mut Vec<DomainQuad<I, V, D>>,
 	graph: Option<&'a D::Subject>,
-	subject: SubjectOrObject<'a, V, I, D>,
+	subject: SubjectOrObject<'a, I, V, D>,
 }
 
 #[derive(Educe)]
 #[educe(Clone, Copy)]
-enum SubjectOrObject<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+enum SubjectOrObject<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	Subject(&'a D::Subject),
 	Object(&'a D::Object),
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectOrObject<'a, V, I, D> {
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectOrObject<'a, I, V, D> {
 	fn into_subject(self, domain: &D) -> Result<&'a D::Subject, IntoQuadsError> {
 		match self {
 			Self::Subject(s) => Ok(s),
@@ -975,16 +1003,16 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectOrObject<'a, 
 	}
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
-	for QuadPropertiesSerializer<'a, V, I, D>
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
+	for QuadPropertiesSerializer<'a, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
 	fn predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + crate::LinkedDataPredicateObjects<I, V>,
 	{
 		let subject = self.subject.into_subject(self.domain)?;
 
@@ -1008,8 +1036,8 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 
 	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + crate::LinkedDataPredicateObjects<V, I>,
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + crate::LinkedDataPredicateObjects<I, V>,
 	{
 		let object = self.subject.into_object(self.domain)?;
 
@@ -1033,7 +1061,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataGraph<I, V>,
 	{
 		let graph = self.subject.into_subject(self.domain)?;
 
@@ -1050,7 +1078,7 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 
 	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
 	{
 		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let subject = self
@@ -1074,25 +1102,25 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> SubjectVisitor<V, I>
 	}
 }
 
-struct ObjectsSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+struct ObjectsSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	vocabulary: &'a mut V,
 	interpretation: &'a mut I,
 	domain: &'a mut D,
-	result: &'a mut Vec<DomainQuad<V, I, D>>,
+	result: &'a mut Vec<DomainQuad<I, V, D>>,
 	graph: Option<&'a D::Subject>,
 	subject: &'a D::Subject,
 	predicate: D::Predicate,
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisitor<V, I>
-	for ObjectsSerializer<'a, V, I, D>
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
+	for ObjectsSerializer<'a, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
 	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
 		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let term = self
@@ -1122,25 +1150,25 @@ impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisi
 	}
 }
 
-struct ReversePredicateSerializer<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> {
+struct ReversePredicateSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	vocabulary: &'a mut V,
 	interpretation: &'a mut I,
 	domain: &'a mut D,
-	result: &'a mut Vec<DomainQuad<V, I, D>>,
+	result: &'a mut Vec<DomainQuad<I, V, D>>,
 	graph: Option<&'a D::Subject>,
 	object: D::ObjectRef<'a>,
 	predicate: D::Predicate,
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, D: Domain<V, I>> PredicateObjectsVisitor<V, I>
-	for ReversePredicateSerializer<'a, V, I, D>
+impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
+	for ReversePredicateSerializer<'a, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
 	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + crate::LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
 		let i = value.interpretation(self.vocabulary, self.interpretation);
 		let subject = self

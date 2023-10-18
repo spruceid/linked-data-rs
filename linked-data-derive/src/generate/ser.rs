@@ -62,13 +62,13 @@ fn variant_compound_fields(
 			let visit_field = if field_attrs.flatten {
 				visit.bounds.push(
 					syn::parse2(quote!(
-						#ty: ::linked_data::LinkedDataSubject<V_, I_>
+						#ty: ::linked_data::LinkedDataSubject<I_, V_>
 					))
 					.unwrap(),
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedDataSubject<V_, I_>>::visit_subject(#field_ref, &mut visitor)?;
+					<#ty as ::linked_data::LinkedDataSubject<I_, V_>>::visit_subject(#field_ref, &mut visitor)?;
 				}
 			} else {
 				match field_attrs.iri {
@@ -79,7 +79,7 @@ fn variant_compound_fields(
 						if field_attrs.graph_value {
 							visit.bounds.push(
 								syn::parse2(quote!(
-									#ty: ::linked_data::LinkedDataGraph<V_, I_>
+									#ty: ::linked_data::LinkedDataGraph<I_, V_>
 								))
 								.unwrap(),
 							);
@@ -93,7 +93,7 @@ fn variant_compound_fields(
 						} else {
 							visit.bounds.push(
 								syn::parse2(quote!(
-									#ty: ::linked_data::LinkedDataPredicateObjects<V_, I_>
+									#ty: ::linked_data::LinkedDataPredicateObjects<I_, V_>
 								))
 								.unwrap(),
 							);

@@ -10,7 +10,7 @@ use crate::{
 macro_rules! deserialize_datatype {
 	($($ty:ty : $iri:ident),*) => {
 		$(
-			impl<V: Vocabulary, I: ReverseLiteralInterpretation<Literal = V::Literal>> LinkedDataDeserializeSubject<V, I> for $ty
+			impl<V: Vocabulary, I: ReverseLiteralInterpretation<Literal = V::Literal>> LinkedDataDeserializeSubject<I, V> for $ty
 			where
 				V: LiteralVocabulary<Type = rdf_types::literal::Type<
 					<V as IriVocabulary>::Iri,
@@ -51,7 +51,7 @@ macro_rules! deserialize_datatype {
 				}
 			}
 
-			impl<V: Vocabulary, I: ReverseLiteralInterpretation<Literal = V::Literal>> LinkedDataDeserializePredicateObjects<V, I> for $ty
+			impl<V: Vocabulary, I: ReverseLiteralInterpretation<Literal = V::Literal>> LinkedDataDeserializePredicateObjects<I, V> for $ty
 			where
 				V: LiteralVocabulary<Type = rdf_types::literal::Type<
 					<V as IriVocabulary>::Iri,

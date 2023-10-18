@@ -6,79 +6,79 @@ use crate::{LinkedData, LinkedDataPredicateObjects, LinkedDataResource, LinkedDa
 // use crate::SerializeSubject;
 
 /// Serialize a Linked-Data graph.
-pub trait LinkedDataGraph<V: Vocabulary, I: Interpretation> {
+pub trait LinkedDataGraph<I: Interpretation, V: Vocabulary> {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>;
+		S: GraphVisitor<I, V>;
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for () {
+impl<I: Interpretation, V: Vocabulary> LinkedDataGraph<I, V> for () {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		visitor.end()
 	}
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
+impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataGraph<I, V>> LinkedDataGraph<I, V>
 	for &'a T
 {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		T::visit_graph(self, visitor)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataGraph<I, V>> LinkedDataGraph<I, V>
 	for Box<T>
 {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		T::visit_graph(self, visitor)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Iri {
+impl<I: Interpretation, V: Vocabulary> LinkedDataGraph<I, V> for Iri {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		visitor.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for IriBuf {
+impl<I: Interpretation, V: Vocabulary> LinkedDataGraph<I, V> for IriBuf {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		visitor.end()
 	}
 }
 
-pub trait GraphVisitor<V: Vocabulary, I: Interpretation> {
+pub trait GraphVisitor<I: Interpretation, V: Vocabulary> {
 	type Ok;
 	type Error;
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>;
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, S: GraphVisitor<V, I>> GraphVisitor<V, I> for &'a mut S {
+impl<'a, I: Interpretation, V: Vocabulary, S: GraphVisitor<I, V>> GraphVisitor<I, V> for &'a mut S {
 	type Ok = ();
 	type Error = S::Error;
 
 	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
 	{
 		S::subject(self, value)
 	}
@@ -90,57 +90,57 @@ impl<'a, V: Vocabulary, I: Interpretation, S: GraphVisitor<V, I>> GraphVisitor<V
 
 pub struct AnonymousGraph<T>(pub T);
 
-impl<V: Vocabulary, I: Interpretation, T> LinkedDataResource<V, I> for AnonymousGraph<T> {
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataResource<I, V> for AnonymousGraph<T> {
 	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> crate::ResourceInterpretation<V, I> {
+	) -> crate::ResourceInterpretation<I, V> {
 		crate::ResourceInterpretation::Uninterpreted(None)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataGraph<V, I>> LinkedDataSubject<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataGraph<I, V>> LinkedDataSubject<I, V>
 	for AnonymousGraph<T>
 {
 	fn visit_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::SubjectVisitor<V, I>,
+		S: crate::SubjectVisitor<I, V>,
 	{
 		serializer.graph(&self.0)?;
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataGraph<V, I>> LinkedDataPredicateObjects<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataGraph<I, V>> LinkedDataPredicateObjects<I, V>
 	for AnonymousGraph<T>
 {
 	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::PredicateObjectsVisitor<V, I>,
+		S: crate::PredicateObjectsVisitor<I, V>,
 	{
 		visitor.object(self)?;
 		visitor.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataGraph<V, I>> LinkedDataGraph<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataGraph<I, V>> LinkedDataGraph<I, V>
 	for AnonymousGraph<T>
 {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: GraphVisitor<V, I>,
+		S: GraphVisitor<I, V>,
 	{
 		T::visit_graph(&self.0, visitor)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataGraph<V, I>> LinkedData<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataGraph<I, V>> LinkedData<I, V>
 	for AnonymousGraph<T>
 {
 	fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::Visitor<V, I>,
+		S: crate::Visitor<I, V>,
 	{
 		visitor.named_graph(self)?;
 		visitor.end()

@@ -120,7 +120,7 @@ fn generate_field(
 
 			bounds.push(
 				syn::parse2(
-					quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<V_, I_>),
+					quote!(#ty: ::linked_data::LinkedDataDeserializePredicateObjects<I_, V_>),
 				)
 				.unwrap(),
 			);
@@ -151,7 +151,7 @@ fn generate_field(
 		None => {
 			if attrs.is_id || attrs.flatten {
 				bounds.push(
-					syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializeSubject<V_, I_>))
+					syn::parse2(quote!(#ty: ::linked_data::LinkedDataDeserializeSubject<I_, V_>))
 						.unwrap(),
 				);
 

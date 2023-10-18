@@ -7,87 +7,87 @@ use rdf_types::{
 use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
 
 /// Serialize a Linked-Data node.
-pub trait LinkedDataSubject<V: Vocabulary = (), I: Interpretation = ()> {
+pub trait LinkedDataSubject<I: Interpretation = (), V: Vocabulary = ()> {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>;
+		S: SubjectVisitor<I, V>;
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for () {
+impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for () {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>>
-	LinkedDataSubject<V, I> for &'a T
+impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataSubject<I, V>>
+	LinkedDataSubject<I, V> for &'a T
 {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		T::visit_subject(self, serializer)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: ?Sized + LinkedDataSubject<V, I>> LinkedDataSubject<V, I>
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataSubject<I, V>> LinkedDataSubject<I, V>
 	for Box<T>
 {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		T::visit_subject(self, serializer)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Iri {
+impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for Iri {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for IriBuf {
+impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for IriBuf {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlankId {
+impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for BlankId {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlankIdBuf {
+impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for BlankIdBuf {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T, B> LinkedDataSubject<V, I> for Id<T, B>
+impl<I: Interpretation, V: Vocabulary, T, B> LinkedDataSubject<I, V> for Id<T, B>
 where
-	T: LinkedDataSubject<V, I>,
-	B: LinkedDataSubject<V, I>,
+	T: LinkedDataSubject<I, V>,
+	B: LinkedDataSubject<I, V>,
 {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		match self {
 			Self::Iri(i) => i.visit_subject(serializer),
@@ -96,34 +96,34 @@ where
 	}
 }
 
-pub trait SubjectVisitor<V: Vocabulary, I: Interpretation> {
+pub trait SubjectVisitor<I: Interpretation, V: Vocabulary> {
 	type Ok;
 	type Error;
 
 	/// Visit a predicate of the graph.
 	fn predicate<L, T>(&mut self, predicate: &L, objects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + LinkedDataPredicateObjects<V, I>;
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>;
 
 	/// Visit a reverse predicate of the graph.
 	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + LinkedDataPredicateObjects<V, I>;
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>;
 
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataGraph<V, I>;
+		T: ?Sized + LinkedDataGraph<I, V>;
 
 	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>;
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
-impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisitor<V, I>
+impl<'s, I: Interpretation, V: Vocabulary, S: SubjectVisitor<I, V>> SubjectVisitor<I, V>
 	for &'s mut S
 {
 	type Ok = ();
@@ -131,30 +131,30 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 
 	fn predicate<L, T>(&mut self, predicate: &L, objects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + LinkedDataPredicateObjects<V, I>,
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
 	{
 		S::predicate(self, predicate, objects)
 	}
 
 	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
 	where
-		L: ?Sized + LinkedDataResource<V, I>,
-		T: ?Sized + LinkedDataPredicateObjects<V, I>,
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
 	{
 		S::reverse_predicate(self, predicate, subjects)
 	}
 
 	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataGraph<V, I>,
+		T: ?Sized + LinkedDataGraph<I, V>,
 	{
 		S::graph(self, value)
 	}
 
 	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
-		T: ?Sized + LinkedDataResource<V, I> + LinkedDataSubject<V, I>,
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
 	{
 		S::include(self, value)
 	}
@@ -164,7 +164,7 @@ impl<'s, V: Vocabulary, I: Interpretation, S: SubjectVisitor<V, I>> SubjectVisit
 	}
 }
 
-pub trait LinkedDataDeserializeSubject<V: Vocabulary = (), I: Interpretation = ()>: Sized {
+pub trait LinkedDataDeserializeSubject<I: Interpretation = (), V: Vocabulary = ()>: Sized {
 	fn deserialize_subject<D>(
 		vocabulary: &V,
 		interpretation: &I,
@@ -181,7 +181,7 @@ pub trait LinkedDataDeserializeSubject<V: Vocabulary = (), I: Interpretation = (
 		>;
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for IriBuf
+impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for IriBuf
 where
 	I: ReverseIriInterpretation<Iri = V::Iri>,
 {
@@ -210,7 +210,7 @@ where
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for BlankIdBuf
+impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for BlankIdBuf
 where
 	I: ReverseBlankIdInterpretation<BlankId = V::BlankId>,
 {
@@ -239,7 +239,7 @@ where
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<V, I> for Id
+impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for Id
 where
 	I: ReverseIdInterpretation<Iri = V::Iri, BlankId = V::BlankId>,
 {
@@ -272,8 +272,8 @@ where
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataDeserializeSubject<V, I>>
-	LinkedDataDeserializeSubject<V, I> for Box<T>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
+	LinkedDataDeserializeSubject<I, V> for Box<T>
 {
 	fn deserialize_subject<D>(
 		vocabulary: &V,

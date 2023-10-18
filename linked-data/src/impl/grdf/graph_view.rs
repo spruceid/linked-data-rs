@@ -7,16 +7,16 @@ use crate::{
 	ResourceInterpretation, SubjectVisitor,
 };
 
-impl<'a, G: ?Sized + Graph, A: GraphAccess<G>, V: Vocabulary, I: Interpretation>
-	LinkedDataSubject<V, I> for GraphView<'a, G, A>
+impl<'a, G: ?Sized + Graph, A: GraphAccess<G>, I: Interpretation, V: Vocabulary>
+	LinkedDataSubject<I, V> for GraphView<'a, G, A>
 where
 	G::Subject: Eq + Hash,
-	G::Predicate: LinkedDataResource<V, I>,
-	G::Object: LinkedDataResource<V, I>,
+	G::Predicate: LinkedDataResource<I, V>,
+	G::Object: LinkedDataResource<I, V>,
 {
 	fn visit_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		let mut visited = im::HashSet::new();
 		visited.insert(self.subject);
@@ -35,16 +35,16 @@ struct PredicateObjects<'d, 'v, G: ?Sized + Graph, A> {
 	visited: &'v im::HashSet<&'d G::Subject>,
 }
 
-impl<'d, 'v, G: ?Sized + Graph, A: GraphAccess<G>, V: Vocabulary, I: Interpretation>
-	LinkedDataPredicateObjects<V, I> for PredicateObjects<'d, 'v, G, A>
+impl<'d, 'v, G: ?Sized + Graph, A: GraphAccess<G>, I: Interpretation, V: Vocabulary>
+	LinkedDataPredicateObjects<I, V> for PredicateObjects<'d, 'v, G, A>
 where
 	G::Subject: Eq + Hash,
-	G::Predicate: LinkedDataResource<V, I>,
-	G::Object: LinkedDataResource<V, I>,
+	G::Predicate: LinkedDataResource<I, V>,
+	G::Object: LinkedDataResource<I, V>,
 {
 	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: PredicateObjectsVisitor<V, I>,
+		S: PredicateObjectsVisitor<I, V>,
 	{
 		for object in self.graph.objects(self.subject, self.predicate) {
 			visitor.object(&Object {
@@ -59,16 +59,16 @@ where
 	}
 }
 
-impl<'a, 'v, G: ?Sized + Graph, A, V: Vocabulary, I: Interpretation> LinkedDataResource<V, I>
+impl<'a, 'v, G: ?Sized + Graph, A, I: Interpretation, V: Vocabulary> LinkedDataResource<I, V>
 	for Object<'a, 'v, G, A>
 where
-	G::Object: LinkedDataResource<V, I>,
+	G::Object: LinkedDataResource<I, V>,
 {
 	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> ResourceInterpretation<V, I> {
+	) -> ResourceInterpretation<I, V> {
 		self.object.interpretation(vocabulary, interpretation)
 	}
 }
@@ -80,16 +80,16 @@ struct Object<'a, 'v, G: ?Sized + Graph, A> {
 	visited: &'v im::HashSet<&'a G::Subject>,
 }
 
-impl<'a, 'v, G: ?Sized + Graph, A: GraphAccess<G>, V: Vocabulary, I: Interpretation>
-	LinkedDataSubject<V, I> for Object<'a, 'v, G, A>
+impl<'a, 'v, G: ?Sized + Graph, A: GraphAccess<G>, I: Interpretation, V: Vocabulary>
+	LinkedDataSubject<I, V> for Object<'a, 'v, G, A>
 where
 	G::Subject: Eq + Hash,
-	G::Predicate: LinkedDataResource<V, I>,
-	G::Object: LinkedDataResource<V, I>,
+	G::Predicate: LinkedDataResource<I, V>,
+	G::Object: LinkedDataResource<I, V>,
 {
 	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		if let Some(subject) = self.access.object_as_subject(self.graph, self.object) {
 			let mut visited = self.visited.clone();
@@ -131,12 +131,12 @@ where
 		}
 	}
 
-	fn visit<V: Vocabulary, I: Interpretation, S>(&self, visitor: &mut S) -> Result<(), S::Error>
+	fn visit<I: Interpretation, V: Vocabulary, S>(&self, visitor: &mut S) -> Result<(), S::Error>
 	where
 		A: GraphAccess<G>,
-		S: SubjectVisitor<V, I>,
-		G::Predicate: LinkedDataResource<V, I>,
-		G::Object: LinkedDataResource<V, I>,
+		S: SubjectVisitor<I, V>,
+		G::Predicate: LinkedDataResource<I, V>,
+		G::Object: LinkedDataResource<I, V>,
 	{
 		for (predicate, _) in self.graph.predicates(self.subject) {
 			visitor.predicate(
@@ -155,16 +155,16 @@ where
 	}
 }
 
-impl<'a, 'v, G: ?Sized + Graph, A: GraphAccess<G>, V: Vocabulary, I: Interpretation>
-	LinkedDataSubject<V, I> for Subject<'a, 'v, G, A>
+impl<'a, 'v, G: ?Sized + Graph, A: GraphAccess<G>, I: Interpretation, V: Vocabulary>
+	LinkedDataSubject<I, V> for Subject<'a, 'v, G, A>
 where
 	G::Subject: Eq + Hash,
-	G::Predicate: LinkedDataResource<V, I>,
-	G::Object: LinkedDataResource<V, I>,
+	G::Predicate: LinkedDataResource<I, V>,
+	G::Object: LinkedDataResource<I, V>,
 {
 	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: SubjectVisitor<V, I>,
+		S: SubjectVisitor<I, V>,
 	{
 		if self.visit_predicates {
 			for (predicate, _) in self.graph.predicates(self.subject) {

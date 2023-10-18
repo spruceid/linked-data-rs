@@ -15,55 +15,55 @@ impl<T> From<T> for Ref<T> {
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataResource<V, I>> LinkedDataResource<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataResource<I, V>
 	for Ref<T>
 {
 	fn interpretation(
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> crate::ResourceInterpretation<V, I> {
+	) -> crate::ResourceInterpretation<I, V> {
 		T::reference_interpretation(&self.0, vocabulary, interpretation)
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T> LinkedDataSubject<V, I> for Ref<T> {
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataSubject<I, V> for Ref<T> {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::SubjectVisitor<V, I>,
+		S: crate::SubjectVisitor<I, V>,
 	{
 		serializer.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataResource<V, I>> LinkedDataPredicateObjects<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataPredicateObjects<I, V>
 	for Ref<T>
 {
 	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::PredicateObjectsVisitor<V, I>,
+		S: crate::PredicateObjectsVisitor<I, V>,
 	{
 		visitor.object(self)?;
 		visitor.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataResource<V, I>> LinkedDataGraph<V, I>
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataGraph<I, V>
 	for Ref<T>
 {
 	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::GraphVisitor<V, I>,
+		S: crate::GraphVisitor<I, V>,
 	{
 		visitor.subject(self)?;
 		visitor.end()
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, T: LinkedDataResource<V, I>> LinkedData<V, I> for Ref<T> {
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedData<I, V> for Ref<T> {
 	fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
-		S: crate::Visitor<V, I>,
+		S: crate::Visitor<I, V>,
 	{
 		visitor.default_graph(self)?;
 		visitor.end()

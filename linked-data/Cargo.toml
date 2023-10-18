@@ -8,7 +8,7 @@ default = ["derive", "serde"]
 derive = ["linked-data-derive"]
 
 [dependencies]
-rdf-types = "0.17"
+rdf-types = "0.17.5"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.21"
