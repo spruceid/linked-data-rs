@@ -2,10 +2,10 @@ use educe::Educe;
 use iref::IriBuf;
 use rdf_types::{
 	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id, InsertIntoVocabulary,
-	Interpretation, InterpretationMut, IriInterpretationMut, IriVocabularyMut,
-	LiteralInterpretationMut, LiteralVocabularyMut, Quad, ReverseLiteralInterpretation, Term,
-	Vocabulary,
+	BlankIdInterpretationMut, BlankIdVocabulary, ExportedFromVocabulary, Generator, Id,
+	InsertIntoVocabulary, Interpretation, InterpretationMut, IriInterpretationMut, IriVocabulary,
+	IriVocabularyMut, LiteralInterpretationMut, LiteralVocabularyMut, Quad,
+	ReverseLiteralInterpretation, Term, Vocabulary,
 };
 
 use crate::{
@@ -117,7 +117,7 @@ where
 pub fn to_lexical_quads_with<V: Vocabulary, I: Interpretation>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
-	generator: impl Generator<()>,
+	generator: impl Generator<V>,
 	value: &impl LinkedData<V, I>,
 ) -> Result<Vec<Quad>, IntoQuadsError>
 where
@@ -650,7 +650,17 @@ fn lexical_term<V: Vocabulary>(vocabulary: &V, term: CowRdfTerm<V>) -> Term {
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, G: Generator<()>> Domain<V, I> for LexicalDomain<G>
+fn next_lexical_id<V: IriVocabulary + BlankIdVocabulary>(
+	vocabulary: &mut V,
+	mut generator: impl Generator<V>,
+) -> Id {
+	match generator.next(vocabulary) {
+		Id::Iri(i) => Id::Iri(vocabulary.iri(&i).unwrap().to_owned()),
+		Id::Blank(b) => Id::Blank(vocabulary.blank_id(&b).unwrap().to_owned()),
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, G: Generator<V>> Domain<V, I> for LexicalDomain<G>
 where
 	I: ReverseIriInterpretation<Iri = V::Iri>
 		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -680,11 +690,11 @@ where
 					return Ok(Id::Blank(blank_id.to_owned()));
 				}
 
-				Ok(self.generator.next(&mut ()))
+				Ok(next_lexical_id(vocabulary, &mut self.generator))
 			}
 			ResourceInterpretation::Uninterpreted(u) => u
 				.map(|t| lexical_term(vocabulary, t))
-				.unwrap_or_else(|| Term::Id(self.generator.next(&mut ())))
+				.unwrap_or_else(|| Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
 				.into_id()
 				.ok_or(IntoQuadsError::Subject),
 		}
@@ -739,7 +749,7 @@ where
 					return Ok(Term::Id(Id::Blank(blank_id.to_owned())));
 				}
 
-				Ok(Term::Id(self.generator.next(&mut ())))
+				Ok(Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
 			}
 			ResourceInterpretation::Uninterpreted(u) => {
 				let term = match u {
@@ -761,7 +771,7 @@ where
 					Some(CowRdfTerm::Borrowed(Term::Literal(lit))) => {
 						Term::Literal(lit.into_lexical(vocabulary))
 					}
-					None => Term::Id(self.generator.next(&mut ())),
+					None => Term::Id(next_lexical_id(vocabulary, &mut self.generator)),
 				};
 
 				Ok(term)
@@ -787,11 +797,11 @@ where
 					return Ok(Id::Blank(blank_id.to_owned()));
 				}
 
-				Ok(self.generator.next(&mut ()))
+				Ok(next_lexical_id(vocabulary, &mut self.generator))
 			}
 			ResourceInterpretation::Uninterpreted(u) => u
 				.map(|t| lexical_term(vocabulary, t))
-				.unwrap_or_else(|| Term::Id(self.generator.next(&mut ())))
+				.unwrap_or_else(|| Term::Id(next_lexical_id(vocabulary, &mut self.generator)))
 				.into_id()
 				.ok_or(IntoQuadsError::Graph),
 		}
