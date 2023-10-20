@@ -37,6 +37,46 @@ pub enum CowRdfTerm<'a, V: Vocabulary> {
 	Owned(RdfTerm<V>),
 }
 
+impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
+	pub fn from_str(vocabulary: &V, value: &'a str, ty: &'a V::Iri) -> Self {
+		use xsd_types::ValueRef;
+
+		let ty_iri = vocabulary.iri(ty).unwrap();
+
+		if ty_iri == RDF_JSON {
+			use json_syntax::Parse;
+			match json_syntax::Value::parse_str(value, |_| ()) {
+				Ok(json) => {
+					CowRdfTerm::Owned(RdfTerm::Literal(RdfLiteral::Json(json.into_value())))
+				}
+				Err(_) => CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Any(
+					value,
+					literal::Type::Any(ty),
+				))),
+			}
+		} else {
+			match xsd_types::Datatype::from_iri(ty_iri) {
+				Some(xsd_types::Datatype::String(None)) => CowRdfTerm::Borrowed(
+					RdfTermRef::Literal(RdfLiteralRef::Xsd(ValueRef::String(value))),
+				),
+				Some(xsd_ty) => match xsd_ty.parse(value) {
+					Ok(xsd_value) => {
+						CowRdfTerm::Owned(RdfTerm::Literal(RdfLiteral::Xsd(xsd_value)))
+					}
+					Err(_) => CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Any(
+						value,
+						literal::Type::Any(ty),
+					))),
+				},
+				None => CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Any(
+					value,
+					literal::Type::Any(ty),
+				))),
+			}
+		}
+	}
+}
+
 pub enum CowRef<'a, T> {
 	Borrowed(&'a T),
 	Owned(T),
