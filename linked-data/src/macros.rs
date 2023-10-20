@@ -97,32 +97,52 @@ macro_rules! json_literal {
 				>
 			{
 				use $crate::rdf_types::literal;
-				let mut is_literal = false;
 
-				let rdf_json = $crate::iref::Iri::new("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON").unwrap();
-
+				let mut literal_ty = None;
 				for l in interpretation.literals_of(resource) {
-					is_literal = true;
 					let literal = vocabulary.literal(l).unwrap();
-					if let literal::Type::Any(ty) = literal.type_() {
-						if let Some(ty_iri) = vocabulary.iri(ty) {
-							if ty_iri == rdf_json {
+					match literal.type_() {
+						literal::Type::Any(ty) => {
+							let ty_iri = vocabulary.iri(ty).unwrap();
+							if ty_iri == $crate::rdf_types::RDF_JSON {
 								use $crate::json_syntax::Parse;
 								let json = $crate::json_syntax::Value::parse_str(literal.value().as_ref(), |_| ())
 									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral)?;
 
 								return $crate::json_syntax::from_meta_value(json).map_err(|_| $crate::FromLinkedDataError::InvalidLiteral)
+							} else {
+								literal_ty = Some(ty_iri)
 							}
+						}
+						literal::Type::LangString(_) => {
+							literal_ty = Some($crate::rdf_types::RDF_LANG_STRING)
 						}
 					}
 				}
 
-				if is_literal {
-					Err($crate::FromLinkedDataError::LiteralTypeMismatch)
-				} else {
-					Err($crate::FromLinkedDataError::ExpectedLiteral)
+				match literal_ty {
+					Some(ty) => {
+						Err($crate::FromLinkedDataError::LiteralTypeMismatch {
+							property: None,
+							expected: Some($crate::rdf_types::RDF_JSON.to_owned()),
+							found: ty.to_owned()
+						})
+					}
+					None => {
+						Err($crate::FromLinkedDataError::ExpectedLiteral)
+					}
 				}
 			}
 		}
 	};
+}
+
+#[cfg(test)]
+mod test {
+	#[derive(Debug, serde::Serialize, serde::Deserialize)]
+	struct Test {
+		field: String,
+	}
+
+	json_literal!(Test);
 }

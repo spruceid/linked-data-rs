@@ -39,7 +39,7 @@
 //! <http://example.org/JohnSmith> <http://example.org/name> "John Smith" .
 //! <http://example.org/JohnSmith> <http://example.org/email> "john.smith@example.org" .
 //! ```
-use iref::Iri;
+use iref::{Iri, IriBuf};
 #[cfg(feature = "derive")]
 pub use linked_data_derive::{Deserialize, Serialize};
 use rdf_types::{Interpretation, Vocabulary};
@@ -91,7 +91,11 @@ pub enum FromLinkedDataError {
 
 	/// Resource has literal interpretations, but none of the expected type.
 	#[error("literal type mismatch")]
-	LiteralTypeMismatch,
+	LiteralTypeMismatch {
+		property: Option<IriBuf>,
+		expected: Option<IriBuf>,
+		found: IriBuf,
+	},
 
 	/// Resource has a literal interpretation of the correct type, but the
 	/// lexical value could not be successfully parsed.

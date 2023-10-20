@@ -1,11 +1,11 @@
 use educe::Educe;
 use iref::IriBuf;
 use rdf_types::{
-	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation, self},
-	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id,
-	InsertIntoVocabulary, Interpretation, InterpretationMut, IriInterpretationMut,
-	IriVocabularyMut, LiteralInterpretationMut, LiteralVocabularyMut, Quad,
-	ReverseLiteralInterpretation, ReverseTermInterpretation, Term, Vocabulary,
+	interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
+	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id, InsertIntoVocabulary,
+	Interpretation, InterpretationMut, IriInterpretationMut, IriVocabularyMut,
+	LiteralInterpretationMut, LiteralVocabularyMut, Quad, ReverseLiteralInterpretation,
+	ReverseTermInterpretation, Term, Vocabulary,
 };
 
 use crate::{
@@ -272,6 +272,7 @@ type DomainQuad<I, V, D> = Quad<
 
 struct VocabularyDomain;
 
+#[allow(clippy::type_complexity)]
 fn resource_term<I>(
 	interpretation: &I,
 	r: &I::Resource,
@@ -280,7 +281,7 @@ where
 	I: ReverseTermInterpretation,
 	I::Iri: Clone,
 	I::BlankId: Clone,
-	I::Literal: Clone
+	I::Literal: Clone,
 {
 	if let Some(iri) = interpretation.iris_of(r).next() {
 		return Ok(Term::Id(Id::Iri(iri.clone())));
@@ -333,15 +334,14 @@ where
 
 				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
-			ResourceInterpretation::Uninterpreted(u) => {
-				match u {
-					Some(u) => u.into_owned().into_id(),
-					None => {
-						let r = interpretation.new_resource(vocabulary);
-						resource_term(interpretation, &r)?.into_id()
-					}
-				}.ok_or(IntoQuadsError::Subject)
+			ResourceInterpretation::Uninterpreted(u) => match u {
+				Some(u) => u.into_owned().into_id(),
+				None => {
+					let r = interpretation.new_resource(vocabulary);
+					resource_term(interpretation, &r)?.into_id()
+				}
 			}
+			.ok_or(IntoQuadsError::Subject),
 		}
 	}
 
@@ -374,9 +374,7 @@ where
 		value: ResourceInterpretation<I, V>,
 	) -> Result<Self::Object, IntoQuadsError> {
 		match value {
-			ResourceInterpretation::Interpreted(r) => {
-				resource_term(interpretation, r)
-			}
+			ResourceInterpretation::Interpreted(r) => resource_term(interpretation, r),
 			ResourceInterpretation::Uninterpreted(u) => {
 				let term = match u {
 					Some(CowRdfTerm::Owned(Term::Id(id))) => Term::Id(id),
@@ -390,7 +388,7 @@ where
 					None => {
 						let r = interpretation.new_resource(vocabulary);
 						resource_term(interpretation, &r)?
-					},
+					}
 				};
 
 				Ok(term)
@@ -416,15 +414,14 @@ where
 
 				Err(IntoQuadsError::MissingLexicalRepresentation)
 			}
-			ResourceInterpretation::Uninterpreted(u) => {
-				match u {
-					Some(u) => u.into_owned().into_id(),
-					None => {
-						let r = interpretation.new_resource(vocabulary);
-						resource_term(interpretation, &r)?.into_id()
-					}
-				}.ok_or(IntoQuadsError::Subject)
+			ResourceInterpretation::Uninterpreted(u) => match u {
+				Some(u) => u.into_owned().into_id(),
+				None => {
+					let r = interpretation.new_resource(vocabulary);
+					resource_term(interpretation, &r)?.into_id()
+				}
 			}
+			.ok_or(IntoQuadsError::Subject),
 		}
 	}
 

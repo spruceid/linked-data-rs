@@ -8,7 +8,7 @@ default = ["derive", "serde"]
 derive = ["linked-data-derive"]
 
 [dependencies]
-rdf-types = "0.18"
+rdf-types = "0.18.1"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
@@ -20,6 +20,9 @@ thiserror.workspace = true
 educe = "0.4.22"
 serde = { version = "1.0", features = ["derive"], optional = true }
 im = "15.1.0"
+
+[dev-dependencies]
+json-syntax = { version = "0.10", features = ["serde", "canonicalize"] }
 
 [[example]]
 name = "derive"

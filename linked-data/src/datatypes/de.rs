@@ -1,6 +1,6 @@
 use rdf_types::{
 	Interpretation, IriVocabulary, LanguageTagVocabulary, LiteralVocabulary,
-	ReverseLiteralInterpretation, Vocabulary,
+	ReverseLiteralInterpretation, Vocabulary, RDF_LANG_STRING,
 };
 
 use crate::{
@@ -28,25 +28,38 @@ macro_rules! deserialize_datatype {
 				where
 					D: grdf::Dataset<Subject = I::Resource, Predicate = I::Resource, Object = I::Resource, GraphLabel = I::Resource>
 				{
-					let mut is_literal = false;
+					let mut literal_ty = None;
 					for l in interpretation.literals_of(resource) {
-						is_literal = true;
 						let l = vocabulary.literal(l).unwrap();
-						if let rdf_types::literal::Type::Any(ty_iri) = l.type_() {
-							let ty_iri = vocabulary.iri(ty_iri).unwrap();
-							if ty_iri == xsd_types::$iri {
-								return match l.value().as_ref().parse() {
-									Ok(value) => Ok(value),
-									Err(_) => Err(FromLinkedDataError::InvalidLiteral)
+						match l.type_() {
+							rdf_types::literal::Type::Any(ty_iri) => {
+								let ty_iri = vocabulary.iri(ty_iri).unwrap();
+								if ty_iri == xsd_types::$iri {
+									return match l.value().as_ref().parse() {
+										Ok(value) => Ok(value),
+										Err(_) => Err(FromLinkedDataError::InvalidLiteral)
+									}
 								}
+
+								literal_ty = Some(ty_iri)
+							}
+							rdf_types::literal::Type::LangString(_) => {
+								literal_ty = Some(RDF_LANG_STRING)
 							}
 						}
 					}
 
-					if is_literal {
-						Err(FromLinkedDataError::LiteralTypeMismatch)
-					} else {
-						Err(FromLinkedDataError::ExpectedLiteral)
+					match literal_ty {
+						Some(ty) => {
+							Err(FromLinkedDataError::LiteralTypeMismatch {
+								property: None,
+								expected: Some(xsd_types::$iri.to_owned()),
+								found: ty.to_owned()
+							})
+						}
+						None => {
+							Err(FromLinkedDataError::ExpectedLiteral)
+						}
 					}
 				}
 			}
