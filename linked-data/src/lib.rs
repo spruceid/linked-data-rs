@@ -85,11 +85,24 @@ pub use subject::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FromLinkedDataError {
-	/// Resource has no literal interpretation.
+	/// Resource has no IRI representation.
+	#[error("expected IRI")]
+	ExpectedIri,
+
+	#[error("unsupported IRI `{found}`")]
+	UnsupportedIri {
+		/// Unsupported IRI.
+		found: IriBuf,
+
+		/// Optional hint listing the supported IRIs.
+		supported: Option<Vec<IriBuf>>,
+	},
+
+	/// Resource has no literal representation.
 	#[error("expected literal")]
 	ExpectedLiteral,
 
-	/// Resource has literal interpretations, but none of the expected type.
+	/// Resource has literal representations, but none of the expected type.
 	#[error("literal type mismatch")]
 	LiteralTypeMismatch {
 		property: Option<IriBuf>,
@@ -97,7 +110,7 @@ pub enum FromLinkedDataError {
 		found: IriBuf,
 	},
 
-	/// Resource has a literal interpretation of the correct type, but the
+	/// Resource has a literal representation of the correct type, but the
 	/// lexical value could not be successfully parsed.
 	#[error("invalid literal")]
 	InvalidLiteral,
