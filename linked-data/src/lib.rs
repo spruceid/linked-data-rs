@@ -242,6 +242,7 @@ impl<'s, I: Interpretation, V: Vocabulary, S: Visitor<I, V>> Visitor<I, V> for &
 pub enum ResourceOrIriRef<'a, I: Interpretation> {
 	Resource(&'a I::Resource),
 	Iri(&'a Iri),
+	Anonymous,
 }
 
 impl<'a, I: Interpretation> ResourceOrIriRef<'a, I> {
@@ -256,6 +257,7 @@ impl<'a, I: Interpretation> ResourceOrIriRef<'a, I> {
 				.next()
 				.map(|i| vocabulary.iri(i).unwrap().to_owned()),
 			Self::Iri(i) => Some(i.to_owned()),
+			Self::Anonymous => None,
 		}
 	}
 }
@@ -295,6 +297,16 @@ impl<'a, I: Interpretation> Context<'a, I> {
 			Self::Predicate { subject } => Self::Object {
 				subject,
 				predicate: ResourceOrIriRef::Iri(predicate),
+			},
+			_ => Self::Subject,
+		}
+	}
+
+	pub fn with_anonymous_predicate(self) -> Self {
+		match self {
+			Self::Predicate { subject } => Self::Object {
+				subject,
+				predicate: ResourceOrIriRef::Anonymous,
 			},
 			_ => Self::Subject,
 		}
