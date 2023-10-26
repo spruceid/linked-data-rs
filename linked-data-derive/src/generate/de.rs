@@ -128,21 +128,25 @@ fn generate_field(
 			Ok(Some(quote! {
 				match vocabulary_.get(unsafe { ::linked_data::iref::Iri::new_unchecked(#iri) }).and_then(|iri| interpretation_.iri_interpretation(&iri)) {
 					Some(predicate_) => {
-						::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects(
+						let context_ = context_.with_predicate(&predicate_);
+						::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects_in(
 							vocabulary_,
 							interpretation_,
 							dataset_,
 							graph_,
-							<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate_)
+							<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate_),
+							context_
 						)?
 					}
 					None => {
-						::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects(
+						let context_ = context_.with_predicate_iri(unsafe {::linked_data::iref::Iri::new_unchecked(#iri) });
+						::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects_in(
 							vocabulary_,
 							interpretation_,
 							dataset_,
 							graph_,
-							[]
+							[],
+							context_
 						)?
 					}
 				}
@@ -156,12 +160,13 @@ fn generate_field(
 				);
 
 				Ok(Some(quote! {
-					::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
+					::linked_data::LinkedDataDeserializeSubject::deserialize_subject_in(
 						vocabulary_,
 						interpretation_,
 						dataset_,
 						graph_,
-						resource_
+						resource_,
+						context_
 					)?
 				}))
 			} else if attrs.ignore {

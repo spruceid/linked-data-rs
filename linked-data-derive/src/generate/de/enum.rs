@@ -13,7 +13,11 @@ pub fn generate(
 	generics: syn::Generics,
 	e: syn::DataEnum,
 ) -> Result<TokenStream, Error> {
-	let mut interpretation_bounds = InterpretationBounds::default();
+	let mut interpretation_bounds = InterpretationBounds {
+		reverse_iri: true,
+		..Default::default()
+	};
+
 	let mut bounds = Vec::new();
 
 	let mut deserialize_variants = Vec::with_capacity(e.variants.len());
@@ -38,21 +42,25 @@ pub fn generate(
 						quote! {
 							match vocabulary_.get(unsafe { ::linked_data::iref::Iri::new_unchecked(#iri) }).and_then(|iri| interpretation_.iri_interpretation(&iri)) {
 								Some(predicate) => {
-									let result = ::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects(
+									let context_ = context_.with_predicate(&predicate);
+									let result = ::linked_data::LinkedDataDeserializePredicateObjects::deserialize_objects_in(
 										vocabulary_,
 										interpretation_,
 										dataset_,
 										graph_,
-										<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate)
+										<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate),
+										context_
 									);
 
 									match result {
 										Ok(value) => return Ok(Self::#v_ident(value)),
-										Err(e) => error = e
+										Err(e) => error = Some(e)
 									}
 								}
 								None => {
-									error = ::linked_data::FromLinkedDataError::MissingRequiredValue
+									error = Some(::linked_data::FromLinkedDataError::MissingRequiredValue(
+										context_.into_iris(vocabulary_, interpretation_)
+									))
 								}
 							}
 						}
@@ -76,22 +84,28 @@ pub fn generate(
 												#(#deserialize_fields)*
 
 												if objects.next().is_some() {
-													Err(::linked_data::FromLinkedDataError::TooManyValues)
+													Err(::linked_data::FromLinkedDataError::TooManyValues(
+														context_.into_iris(vocabulary_, interpretation_)
+													))
 												} else {
 													Ok(Self::#v_ident #constructor)
 												}
 											})()
 										}
-										None => Err(::linked_data::FromLinkedDataError::MissingRequiredValue)
+										None => Err(::linked_data::FromLinkedDataError::MissingRequiredValue(
+											context_.into_iris(vocabulary_, interpretation_)
+										))
 									};
 
 									match result {
 										Ok(value) => return Ok(value),
-										Err(e) => error = e
+										Err(e) => error = Some(e)
 									}
 								}
 								None => {
-									error = ::linked_data::FromLinkedDataError::MissingRequiredValue
+									error = Some(::linked_data::FromLinkedDataError::MissingRequiredValue(
+										context_.into_iris(vocabulary_, interpretation_)
+									))
 								}
 							}
 						}
@@ -113,17 +127,18 @@ pub fn generate(
 			None => match variant_shape(&v.fields) {
 				VariantShape::Simple(_ty) => {
 					quote! {
-						let result = ::linked_data::LinkedDataDeserializeSubject::deserialize_subject(
+						let result = ::linked_data::LinkedDataDeserializeSubject::deserialize_subject_in(
 							vocabulary_,
 							interpretation_,
 							dataset_,
 							graph_,
-							resource_
+							resource_,
+							context_
 						);
 
 						match result {
 							Ok(value) => return Ok(value),
-							Err(e) => error = e
+							Err(e) => error = Some(e)
 						}
 					}
 				}
@@ -143,7 +158,7 @@ pub fn generate(
 
 						match result {
 							Ok(value) => return Ok(value),
-							Err(e) => error = e
+							Err(e) => error = Some(e)
 						}
 					}
 				}
@@ -163,31 +178,41 @@ pub fn generate(
 
 	Ok(quote! {
 		impl #impl_generics ::linked_data::LinkedDataDeserializeSubject<I_, V_> for #ident #ty_generics #where_clause {
-			fn deserialize_subject<D_>(
+			fn deserialize_subject_in<D_>(
 				vocabulary_: &V_,
 				interpretation_: &I_,
 				dataset_: &D_,
 				graph_: &D_::Graph,
-				resource_: &I_::Resource
+				resource_: &I_::Resource,
+				outer_context_: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
 				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
 			{
-				let mut error = ::linked_data::FromLinkedDataError::InvalidSubject;
+				let context_ = outer_context_.with_subject(resource_);
+				let mut error = None;
 
 				#(#deserialize_variants)*
 
-				Err(error)
+				Err(error.unwrap_or_else(|| {
+					::linked_data::FromLinkedDataError::InvalidSubject {
+						context: outer_context_.into_iris(vocabulary_, interpretation_),
+						subject: interpretation_.iris_of(resource_).next().map(|i| {
+							vocabulary_.iri(i).unwrap().to_owned()
+						})
+					}
+				}))
 			}
 		}
 
 		impl #impl_generics ::linked_data::LinkedDataDeserializePredicateObjects<I_, V_> for #ident #ty_generics #where_clause {
-			fn deserialize_objects<'de_, D_>(
+			fn deserialize_objects_in<'de_, D_>(
 				vocabulary: &V_,
 				interpretation: &I_,
 				dataset: &D_,
 				graph: &D_::Graph,
-				objects: impl IntoIterator<Item = &'de_ I_::Resource>
+				objects: impl IntoIterator<Item = &'de_ I_::Resource>,
+				context: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
 				I_::Resource: 'de_,
@@ -197,22 +222,27 @@ pub fn generate(
 
 				match objects.next() {
 					Some(object) => {
-						let value = <Self as ::linked_data::LinkedDataDeserializeSubject<I_, V_>>::deserialize_subject(
+						let value = <Self as ::linked_data::LinkedDataDeserializeSubject<I_, V_>>::deserialize_subject_in(
 							vocabulary,
 							interpretation,
 							dataset,
 							graph,
-							object
+							object,
+							context
 						)?;
 
 						if objects.next().is_some() {
-							Err(::linked_data::FromLinkedDataError::TooManyValues)
+							Err(::linked_data::FromLinkedDataError::TooManyValues(
+								context.into_iris(vocabulary, interpretation)
+							))
 						} else {
 							Ok(value)
 						}
 					}
 					None => {
-						Err(::linked_data::FromLinkedDataError::MissingRequiredValue)
+						Err(::linked_data::FromLinkedDataError::MissingRequiredValue(
+							context.into_iris(vocabulary, interpretation)
+						))
 					}
 				}
 			}

@@ -32,14 +32,15 @@ macro_rules! json_literal {
 		where
 			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
 			V::Value: AsRef<str>,
-			I: $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+			I: $crate::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
-			fn deserialize_objects<'a, D>(
+			fn deserialize_objects_in<'a, D>(
 				vocabulary: &V,
 				interpretation: &I,
 				dataset: &D,
 				graph: &D::Graph,
 				objects: impl IntoIterator<Item = &'a I::Resource>,
+				context: $crate::Context<I>
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
 				I::Resource: 'a,
@@ -54,13 +55,17 @@ macro_rules! json_literal {
 				match objects.next() {
 					Some(object) => {
 						if objects.next().is_none() {
-							<Self as $crate::LinkedDataDeserializeSubject<I, V>>::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+							<Self as $crate::LinkedDataDeserializeSubject<I, V>>::deserialize_subject_in(vocabulary, interpretation, dataset, graph, object, context)
 						} else {
-							Err($crate::FromLinkedDataError::TooManyValues)
+							Err($crate::FromLinkedDataError::TooManyValues(
+								context.into_iris(vocabulary, interpretation)
+							))
 						}
 					}
 					None => {
-						Err($crate::FromLinkedDataError::MissingRequiredValue)
+						Err($crate::FromLinkedDataError::MissingRequiredValue(
+							context.into_iris(vocabulary, interpretation)
+						))
 					}
 				}
 			}
@@ -79,14 +84,15 @@ macro_rules! json_literal {
 		where
 			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
 			V::Value: AsRef<str>,
-			I: $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+			I: $crate::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
-			fn deserialize_subject<D>(
+			fn deserialize_subject_in<D>(
 				vocabulary: &V,
 				interpretation: &I,
 				_dataset: &D,
 				_graph: &D::Graph,
 				resource: &I::Resource,
+				context: $crate::Context<I>
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
 				D: $crate::grdf::Dataset<
@@ -107,9 +113,13 @@ macro_rules! json_literal {
 							if ty_iri == $crate::rdf_types::RDF_JSON {
 								use $crate::json_syntax::Parse;
 								let json = $crate::json_syntax::Value::parse_str(literal.value().as_ref(), |_| ())
-									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral)?;
+									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
+										context.into_iris(vocabulary, interpretation)
+									))?;
 
-								return $crate::json_syntax::from_meta_value(json).map_err(|_| $crate::FromLinkedDataError::InvalidLiteral)
+								return $crate::json_syntax::from_meta_value(json).map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
+									context.into_iris(vocabulary, interpretation)
+								))
 							} else {
 								literal_ty = Some(ty_iri)
 							}
@@ -123,13 +133,15 @@ macro_rules! json_literal {
 				match literal_ty {
 					Some(ty) => {
 						Err($crate::FromLinkedDataError::LiteralTypeMismatch {
-							property: None,
+							context: context.into_iris(vocabulary, interpretation),
 							expected: Some($crate::rdf_types::RDF_JSON.to_owned()),
 							found: ty.to_owned()
 						})
 					}
 					None => {
-						Err($crate::FromLinkedDataError::ExpectedLiteral)
+						Err($crate::FromLinkedDataError::ExpectedLiteral(
+							context.into_iris(vocabulary, interpretation)
+						))
 					}
 				}
 			}

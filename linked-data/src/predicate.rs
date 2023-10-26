@@ -6,7 +6,8 @@ use rdf_types::{
 };
 
 use crate::{
-	FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject,
+	Context, FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource,
+	LinkedDataSubject,
 };
 
 /// Type representing the objects of an RDF subject's predicate binding.
@@ -174,6 +175,23 @@ pub trait PredicateObjectsVisitor<I: Interpretation, V: Vocabulary> {
 pub trait LinkedDataDeserializePredicateObjects<I: Interpretation = (), V: Vocabulary = ()>:
 	Sized
 {
+	fn deserialize_objects_in<'a, D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		objects: impl IntoIterator<Item = &'a I::Resource>,
+		context: Context<I>,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		I::Resource: 'a,
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>;
+
 	fn deserialize_objects<'a, D>(
 		vocabulary: &V,
 		interpretation: &I,
@@ -188,17 +206,28 @@ pub trait LinkedDataDeserializePredicateObjects<I: Interpretation = (), V: Vocab
 			Predicate = I::Resource,
 			Object = I::Resource,
 			GraphLabel = I::Resource,
-		>;
+		>,
+	{
+		Self::deserialize_objects_in(
+			vocabulary,
+			interpretation,
+			dataset,
+			graph,
+			objects,
+			Context::default(),
+		)
+	}
 }
 
 macro_rules! deserialize_single_object {
 	() => {
-		fn deserialize_objects<'a, D>(
+		fn deserialize_objects_in<'a, D>(
 			vocabulary: &V,
 			interpretation: &I,
 			dataset: &D,
 			graph: &D::Graph,
 			objects: impl IntoIterator<Item = &'a I::Resource>,
+			context: $crate::Context<I>,
 		) -> Result<Self, FromLinkedDataError>
 		where
 			I::Resource: 'a,
@@ -214,18 +243,23 @@ macro_rules! deserialize_single_object {
 			match objects.next() {
 				Some(object) => {
 					if objects.next().is_none() {
-						Self::deserialize_subject(
+						Self::deserialize_subject_in(
 							vocabulary,
 							interpretation,
 							dataset,
 							graph,
 							object,
+							context,
 						)
 					} else {
-						Err(FromLinkedDataError::TooManyValues)
+						Err(FromLinkedDataError::TooManyValues(
+							context.into_iris(vocabulary, interpretation),
+						))
 					}
 				}
-				None => Err(FromLinkedDataError::MissingRequiredValue),
+				None => Err(FromLinkedDataError::MissingRequiredValue(
+					context.into_iris(vocabulary, interpretation),
+				)),
 			}
 		}
 	};
@@ -240,7 +274,7 @@ where
 
 impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializePredicateObjects<I, V> for BlankIdBuf
 where
-	I: ReverseBlankIdInterpretation<BlankId = V::BlankId>,
+	I: ReverseIriInterpretation<Iri = V::Iri> + ReverseBlankIdInterpretation<BlankId = V::BlankId>,
 {
 	deserialize_single_object!();
 }
@@ -255,12 +289,13 @@ where
 impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializePredicateObjects<I, V>>
 	LinkedDataDeserializePredicateObjects<I, V> for Box<T>
 {
-	fn deserialize_objects<'a, D>(
+	fn deserialize_objects_in<'a, D>(
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
 		graph: &D::Graph,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
@@ -271,19 +306,23 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializePredicateObjects<
 			GraphLabel = I::Resource,
 		>,
 	{
-		T::deserialize_objects(vocabulary, interpretation, dataset, graph, objects).map(Box::new)
+		T::deserialize_objects_in(vocabulary, interpretation, dataset, graph, objects, context)
+			.map(Box::new)
 	}
 }
 
 impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
 	LinkedDataDeserializePredicateObjects<I, V> for Option<T>
+where
+	I: ReverseIriInterpretation<Iri = V::Iri>,
 {
-	fn deserialize_objects<'a, D>(
+	fn deserialize_objects_in<'a, D>(
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
 		graph: &D::Graph,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
@@ -298,10 +337,19 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
 		match objects.next() {
 			Some(object) => {
 				if objects.next().is_none() {
-					T::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
-						.map(Some)
+					T::deserialize_subject_in(
+						vocabulary,
+						interpretation,
+						dataset,
+						graph,
+						object,
+						context,
+					)
+					.map(Some)
 				} else {
-					Err(FromLinkedDataError::TooManyValues)
+					Err(FromLinkedDataError::TooManyValues(
+						context.into_iris(vocabulary, interpretation),
+					))
 				}
 			}
 			None => Ok(None),

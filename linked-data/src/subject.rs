@@ -4,7 +4,9 @@ use rdf_types::{
 	BlankId, BlankIdBuf, Id, Interpretation, ReverseIdInterpretation, Vocabulary,
 };
 
-use crate::{FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource};
+use crate::{
+	Context, FromLinkedDataError, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource,
+};
 
 /// Serialize a Linked-Data node.
 pub trait LinkedDataSubject<I: Interpretation = (), V: Vocabulary = ()> {
@@ -165,6 +167,22 @@ impl<'s, I: Interpretation, V: Vocabulary, S: SubjectVisitor<I, V>> SubjectVisit
 }
 
 pub trait LinkedDataDeserializeSubject<I: Interpretation = (), V: Vocabulary = ()>: Sized {
+	fn deserialize_subject_in<D>(
+		vocabulary: &V,
+		interpretation: &I,
+		dataset: &D,
+		graph: &D::Graph,
+		resource: &I::Resource,
+		context: Context<I>,
+	) -> Result<Self, FromLinkedDataError>
+	where
+		D: grdf::Dataset<
+			Subject = I::Resource,
+			Predicate = I::Resource,
+			Object = I::Resource,
+			GraphLabel = I::Resource,
+		>;
+
 	fn deserialize_subject<D>(
 		vocabulary: &V,
 		interpretation: &I,
@@ -178,19 +196,30 @@ pub trait LinkedDataDeserializeSubject<I: Interpretation = (), V: Vocabulary = (
 			Predicate = I::Resource,
 			Object = I::Resource,
 			GraphLabel = I::Resource,
-		>;
+		>,
+	{
+		Self::deserialize_subject_in(
+			vocabulary,
+			interpretation,
+			dataset,
+			graph,
+			resource,
+			Context::default(),
+		)
+	}
 }
 
 impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for IriBuf
 where
 	I: ReverseIriInterpretation<Iri = V::Iri>,
 {
-	fn deserialize_subject<D>(
+	fn deserialize_subject_in<D>(
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
 		_graph: &D::Graph,
 		resource: &I::Resource,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		D: grdf::Dataset<
@@ -205,21 +234,25 @@ where
 				let iri = vocabulary.iri(i).unwrap();
 				Ok(iri.to_owned())
 			}
-			None => Err(FromLinkedDataError::InvalidSubject),
+			None => Err(FromLinkedDataError::InvalidSubject {
+				context: context.into_iris(vocabulary, interpretation),
+				subject: None,
+			}),
 		}
 	}
 }
 
 impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for BlankIdBuf
 where
-	I: ReverseBlankIdInterpretation<BlankId = V::BlankId>,
+	I: ReverseIriInterpretation<Iri = V::Iri> + ReverseBlankIdInterpretation<BlankId = V::BlankId>,
 {
-	fn deserialize_subject<D>(
+	fn deserialize_subject_in<D>(
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
 		_graph: &D::Graph,
 		resource: &I::Resource,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		D: grdf::Dataset<
@@ -234,7 +267,13 @@ where
 				let blank_id = vocabulary.blank_id(b).unwrap();
 				Ok(blank_id.to_owned())
 			}
-			None => Err(FromLinkedDataError::InvalidSubject),
+			None => Err(FromLinkedDataError::InvalidSubject {
+				context: context.into_iris(vocabulary, interpretation),
+				subject: interpretation
+					.iris_of(resource)
+					.next()
+					.map(|i| vocabulary.iri(i).unwrap().to_owned()),
+			}),
 		}
 	}
 }
@@ -243,12 +282,13 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataDeserializeSubject<I, V> for Id
 where
 	I: ReverseIdInterpretation<Iri = V::Iri, BlankId = V::BlankId>,
 {
-	fn deserialize_subject<D>(
+	fn deserialize_subject_in<D>(
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
 		_graph: &D::Graph,
 		resource: &I::Resource,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		D: grdf::Dataset<
@@ -267,7 +307,10 @@ where
 				let blank_id = vocabulary.blank_id(b).unwrap();
 				Ok(Id::Blank(blank_id.to_owned()))
 			}
-			None => Err(FromLinkedDataError::InvalidSubject),
+			None => Err(FromLinkedDataError::InvalidSubject {
+				context: context.into_iris(vocabulary, interpretation),
+				subject: None,
+			}),
 		}
 	}
 }
@@ -275,12 +318,13 @@ where
 impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
 	LinkedDataDeserializeSubject<I, V> for Box<T>
 {
-	fn deserialize_subject<D>(
+	fn deserialize_subject_in<D>(
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
 		graph: &D::Graph,
 		resource: &I::Resource,
+		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		D: grdf::Dataset<
@@ -290,6 +334,14 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
 			GraphLabel = I::Resource,
 		>,
 	{
-		T::deserialize_subject(vocabulary, interpretation, dataset, graph, resource).map(Box::new)
+		T::deserialize_subject_in(
+			vocabulary,
+			interpretation,
+			dataset,
+			graph,
+			resource,
+			context,
+		)
+		.map(Box::new)
 	}
 }
