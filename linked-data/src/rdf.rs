@@ -8,7 +8,6 @@ use rdf_types::{
 	IriVocabularyMut, LanguageTagVocabulary, LiteralVocabulary, LiteralVocabularyMut, Quad, Term,
 	Vocabulary,
 };
-use xsd_types::XsdDatatype;
 
 pub type RdfId<V> = Id<<V as IriVocabulary>::Iri, <V as BlankIdVocabulary>::BlankId>;
 pub type RdfTerm<V> = Term<RdfId<V>, RdfLiteral<V>>;
@@ -56,9 +55,11 @@ impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
 			}
 		} else {
 			match xsd_types::Datatype::from_iri(ty_iri) {
-				Some(xsd_types::Datatype::String(None)) => CowRdfTerm::Borrowed(
-					RdfTermRef::Literal(RdfLiteralRef::Xsd(ValueRef::String(value))),
-				),
+				Some(xsd_types::Datatype::String(xsd_types::StringDatatype::String)) => {
+					CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Xsd(ValueRef::String(
+						value,
+					))))
+				}
 				Some(xsd_ty) => match xsd_ty.parse(value) {
 					Ok(xsd_value) => {
 						CowRdfTerm::Owned(RdfTerm::Literal(RdfLiteral::Xsd(xsd_value)))
@@ -214,7 +215,7 @@ impl<V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteral<V, M> {
 				literal::Type::LangString(vocabulary.owned_language_tag(lang).ok().unwrap()),
 			),
 			Self::Xsd(value) => {
-				let ty = value.type_().iri().to_owned();
+				let ty = value.datatype().iri().to_owned();
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
 			}
 			Self::Json(value) => {
@@ -235,7 +236,7 @@ impl<V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteral<V, M> {
 
 				RdfLiteralRef::Any(value, ty)
 			}
-			Self::Xsd(value) => RdfLiteralRef::Xsd(value.as_value_ref()),
+			Self::Xsd(value) => RdfLiteralRef::Xsd(value.as_ref()),
 			Self::Json(value) => RdfLiteralRef::Json(value),
 		}
 	}
@@ -267,7 +268,7 @@ where
 				vocabulary.insert_owned_literal(rdf_types::Literal::new(s.into(), ty.into()))
 			}
 			Self::Xsd(v) => {
-				let ty = rdf_types::literal::Type::Any(vocabulary.insert(v.type_().iri()));
+				let ty = rdf_types::literal::Type::Any(vocabulary.insert(v.datatype().iri()));
 				vocabulary.insert_owned_literal(rdf_types::Literal::new(v.into(), ty.into()))
 			}
 			Self::Json(v) => {
@@ -305,7 +306,7 @@ impl<'a, V: IriVocabulary + LanguageTagVocabulary, M> RdfLiteralRef<'a, V, M> {
 				literal::Type::LangString(vocabulary.language_tag(lang).unwrap().cloned()),
 			),
 			Self::Xsd(value) => {
-				let ty = value.type_().iri().to_owned();
+				let ty = value.datatype().iri().to_owned();
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
 			}
 			Self::Json(value) => {
