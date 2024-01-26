@@ -112,12 +112,12 @@ macro_rules! json_literal {
 							let ty_iri = vocabulary.iri(ty).unwrap();
 							if ty_iri == $crate::rdf_types::RDF_JSON {
 								use $crate::json_syntax::Parse;
-								let json = $crate::json_syntax::Value::parse_str(literal.value().as_ref(), |_| ())
+								let (json, _) = $crate::json_syntax::Value::parse_str(literal.value().as_ref())
 									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
 										context.into_iris(vocabulary, interpretation)
 									))?;
 
-								return $crate::json_syntax::from_meta_value(json).map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
+								return $crate::json_syntax::from_value(json).map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
 									context.into_iris(vocabulary, interpretation)
 								))
 							} else {
