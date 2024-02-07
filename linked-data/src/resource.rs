@@ -238,6 +238,45 @@ impl<
 	}
 }
 
+impl<
+		V: Vocabulary,
+		I: Interpretation,
+		T: LinkedDataResource<I, V>,
+		B: LinkedDataResource<I, V>,
+		L: LinkedDataResource<I, V>,
+	> LinkedDataResource<I, V> for Term<Id<T, B>, L>
+{
+	fn interpretation(
+		&self,
+		vocabulary: &mut V,
+		interpretation: &mut I,
+	) -> ResourceInterpretation<I, V> {
+		match self {
+			Self::Id(id) => id.reference_interpretation(vocabulary, interpretation),
+			Self::Literal(l) => l.interpretation(vocabulary, interpretation),
+		}
+	}
+}
+
+impl<V: Vocabulary, I: Interpretation, S: AsRef<str>> LinkedDataResource<I, V>
+	for rdf_types::Literal<rdf_types::literal::Type<V::Iri, V::LanguageTag>, S>
+{
+	fn interpretation(
+		&self,
+		_vocabulary: &mut V,
+		_interpretation: &mut I,
+	) -> ResourceInterpretation<I, V> {
+		let ty = match self.type_() {
+			rdf_types::literal::Type::Any(i) => rdf_types::literal::Type::Any(i),
+			rdf_types::literal::Type::LangString(l) => rdf_types::literal::Type::LangString(l),
+		};
+
+		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(
+			crate::RdfLiteralRef::Any(self.value().as_ref(), ty),
+		))))
+	}
+}
+
 impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataResource<I, V>
 	for Option<T>
 {
