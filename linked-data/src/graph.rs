@@ -61,6 +61,34 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataGraph<I, V> for IriBuf {
 	}
 }
 
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataSubject<I, V> + LinkedDataResource<I, V>>
+	LinkedDataGraph<I, V> for [T]
+{
+	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<I, V>,
+	{
+		for t in self {
+			visitor.subject(t)?;
+		}
+		visitor.end()
+	}
+}
+
+impl<I: Interpretation, V: Vocabulary, T: LinkedDataSubject<I, V> + LinkedDataResource<I, V>>
+	LinkedDataGraph<I, V> for Vec<T>
+{
+	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	where
+		S: GraphVisitor<I, V>,
+	{
+		for t in self {
+			visitor.subject(t)?;
+		}
+		visitor.end()
+	}
+}
+
 pub trait GraphVisitor<I: Interpretation, V: Vocabulary> {
 	type Ok;
 	type Error;
