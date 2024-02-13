@@ -136,12 +136,53 @@ where
 	})
 }
 
+pub fn to_lexical_subject_quads_with<I: Interpretation, V: Vocabulary>(
+	vocabulary: &mut V,
+	interpretation: &mut I,
+	graph: Option<&Id>,
+	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
+) -> Result<(Id, Vec<Quad>), IntoQuadsError>
+where
+	I: InterpretationMut<V>
+		+ ReverseIriInterpretation<Iri = V::Iri>
+		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
+		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+	I::Resource: Clone,
+	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+{
+	let mut result = Vec::new();
+
+	let i = value.interpretation(vocabulary, interpretation);
+	let subject = LexicalDomain.subject(vocabulary, interpretation, i)?;
+
+	value.visit_subject(QuadPropertiesSerializer {
+		vocabulary,
+		interpretation,
+		domain: &mut LexicalDomain,
+		graph,
+		subject: SubjectOrObject::Subject(&subject),
+		result: &mut result,
+	})?;
+
+	Ok((subject, result))
+}
+
 pub fn to_lexical_quads<G: Generator>(
 	generator: G,
 	value: &impl LinkedData<interpretation::WithGenerator<G>>,
 ) -> Result<Vec<Quad>, IntoQuadsError> {
 	let mut interpretation = rdf_types::interpretation::WithGenerator::new((), generator);
 	to_lexical_quads_with(&mut (), &mut interpretation, value)
+}
+
+pub fn to_lexical_subject_quads<G: Generator>(
+	generator: G,
+	graph: Option<&Id>,
+	value: &(impl LinkedDataSubject<interpretation::WithGenerator<G>>
+	      + LinkedDataResource<interpretation::WithGenerator<G>>),
+) -> Result<(Id, Vec<Quad>), IntoQuadsError> {
+	let mut interpretation = rdf_types::interpretation::WithGenerator::new((), generator);
+	to_lexical_subject_quads_with(&mut (), &mut interpretation, graph, value)
 }
 
 pub fn to_quads_with<I: InterpretationMut<V>, V: Vocabulary>(

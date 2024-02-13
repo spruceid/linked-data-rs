@@ -77,7 +77,8 @@ pub use graph::*;
 pub use predicate::*;
 pub use quads::{
 	to_interpreted_graph_quads, to_interpreted_quads, to_interpreted_subject_quads,
-	to_lexical_quads, to_lexical_quads_with, to_quads, to_quads_with, IntoQuadsError,
+	to_lexical_quads, to_lexical_quads_with, to_lexical_subject_quads,
+	to_lexical_subject_quads_with, to_quads, to_quads_with, IntoQuadsError,
 };
 pub use rdf::*;
 pub use reference::*;
