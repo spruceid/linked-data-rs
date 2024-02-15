@@ -13,7 +13,7 @@ rdf-types = "0.18.1"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
 static-iref = "3.0"
-json-syntax = "0.11.1"
+json-syntax = { version = "0.11.1", features = ["canonicalize"] }
 iref.workspace = true
 linked-data-derive = { workspace = true, optional = true }
 thiserror.workspace = true
@@ -22,7 +22,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 im = "15.1.0"
 
 [dev-dependencies]
-json-syntax = { version = "0.11.1", features = ["serde", "canonicalize"] }
+json-syntax = { version = "0.11.1", features = ["serde"] }
 
 [[example]]
 name = "derive"

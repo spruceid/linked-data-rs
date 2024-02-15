@@ -208,7 +208,8 @@ impl<V: IriVocabulary + LanguageTagVocabulary> RdfLiteral<V> {
 				let ty = value.datatype().iri().to_owned();
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
 			}
-			Self::Json(value) => {
+			Self::Json(mut value) => {
+				value.canonicalize();
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(RDF_JSON.to_owned()))
 			}
 		}
@@ -300,6 +301,8 @@ impl<'a, V: IriVocabulary + LanguageTagVocabulary> RdfLiteralRef<'a, V> {
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(ty))
 			}
 			Self::Json(value) => {
+				let mut value = value.clone();
+				value.canonicalize();
 				rdf_types::Literal::new(value.to_string(), literal::Type::Any(RDF_JSON.to_owned()))
 			}
 		}
