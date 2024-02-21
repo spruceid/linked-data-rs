@@ -13,7 +13,7 @@ rdf-types = "0.18.1"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
 static-iref = "3.0"
-json-syntax = { version = "0.11.1", features = ["canonicalize"] }
+json-syntax = { version = "0.12", features = ["canonicalize"] }
 iref.workspace = true
 linked-data-derive = { workspace = true, optional = true }
 thiserror.workspace = true
