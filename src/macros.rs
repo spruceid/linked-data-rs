@@ -30,26 +30,20 @@ macro_rules! json_literal {
 
 		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializePredicateObjects<I, V> for $ty
 		where
-			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
-			V::Value: AsRef<str>,
-			I: $crate::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+			V: $crate::rdf_types::Vocabulary,
+			I: $crate::rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
 			fn deserialize_objects_in<'a, D>(
 				vocabulary: &V,
 				interpretation: &I,
 				dataset: &D,
-				graph: &D::Graph,
+				graph: Option<&I::Resource>,
 				objects: impl IntoIterator<Item = &'a I::Resource>,
 				context: $crate::Context<I>
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
 				I::Resource: 'a,
-				D: $crate::grdf::Dataset<
-					Subject = I::Resource,
-					Predicate = I::Resource,
-					Object = I::Resource,
-					GraphLabel = I::Resource,
-				>
+				D: $crate::rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
 			{
 				let mut objects = objects.into_iter();
 				match objects.next() {
@@ -82,37 +76,31 @@ macro_rules! json_literal {
 
 		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializeSubject<I, V> for $ty
 		where
-			V: $crate::rdf_types::Vocabulary<Type = $crate::rdf_types::literal::Type<<V as $crate::rdf_types::IriVocabulary>::Iri, <V as $crate::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
-			V::Value: AsRef<str>,
-			I: $crate::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+			V: $crate::rdf_types::Vocabulary,
+			I: $crate::rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
 			fn deserialize_subject_in<D>(
 				vocabulary: &V,
 				interpretation: &I,
 				_dataset: &D,
-				_graph: &D::Graph,
+				_graph: Option<&I::Resource>,
 				resource: &I::Resource,
 				context: $crate::Context<I>
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
-				D: $crate::grdf::Dataset<
-					Subject = I::Resource,
-					Predicate = I::Resource,
-					Object = I::Resource,
-					GraphLabel = I::Resource,
-				>
+				D: $crate::rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
 			{
-				use $crate::rdf_types::literal;
+				use $crate::rdf_types::LiteralTypeRef;
 
 				let mut literal_ty = None;
 				for l in interpretation.literals_of(resource) {
 					let literal = vocabulary.literal(l).unwrap();
-					match literal.type_() {
-						literal::Type::Any(ty) => {
+					match literal.type_ {
+						LiteralTypeRef::Any(ty) => {
 							let ty_iri = vocabulary.iri(ty).unwrap();
 							if ty_iri == $crate::rdf_types::RDF_JSON {
 								use $crate::json_syntax::Parse;
-								let (json, _) = $crate::json_syntax::Value::parse_str(literal.value().as_ref())
+								let (json, _) = $crate::json_syntax::Value::parse_str(literal.value)
 									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
 										context.into_iris(vocabulary, interpretation)
 									))?;
@@ -124,7 +112,7 @@ macro_rules! json_literal {
 								literal_ty = Some(ty_iri)
 							}
 						}
-						literal::Type::LangString(_) => {
+						LiteralTypeRef::LangString(_) => {
 							literal_ty = Some($crate::rdf_types::RDF_LANG_STRING)
 						}
 					}

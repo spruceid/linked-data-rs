@@ -134,7 +134,7 @@ fn generate_field(
 							interpretation_,
 							dataset_,
 							graph_,
-							<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate_),
+							::linked_data::rdf_types::dataset::PatternMatchingDataset::quad_objects(dataset_, graph_, resource_, &predicate_),
 							context_
 						)?
 					}

@@ -126,7 +126,7 @@ impl ToTokens for VocabularyBounds {
 
 		if self.iri_mut {
 			tokens.extend(quote! {
-				+ ::linked_data::rdf_types::IriVocabularyMut
+				+ ::linked_data::rdf_types::vocabulary::IriVocabularyMut
 			})
 		}
 	}
@@ -153,7 +153,7 @@ impl ToTokens for InterpretationBounds {
 
 		if self.iri_mut {
 			tokens.extend(quote! {
-				+ ::linked_data::rdf_types::IriInterpretation<V_::Iri>
+				+ ::linked_data::rdf_types::interpretation::IriInterpretation<V_::Iri>
 			})
 		}
 

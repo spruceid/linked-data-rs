@@ -1,9 +1,9 @@
 use educe::Educe;
 use iref::{Iri, IriBuf};
 use rdf_types::{
-	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut,
-	ReverseLiteralInterpretation, Term, Vocabulary,
+	interpretation::ReverseTermInterpretation,
+	vocabulary::{BlankIdVocabularyMut, IriVocabularyMut},
+	BlankId, BlankIdBuf, Id, Interpretation, Term, Vocabulary,
 };
 use std::fmt;
 
@@ -11,9 +11,7 @@ use crate::{AsRdfLiteral, CowRdfTerm};
 
 /// Resource interpretation.
 #[derive(Educe)]
-#[educe(Debug(
-	bound = "I::Resource: fmt::Debug, V::Iri: fmt::Debug, V::BlankId: fmt::Debug, V::LanguageTag: fmt::Debug"
-))]
+#[educe(Debug(bound = "I::Resource: fmt::Debug, V::Iri: fmt::Debug, V::BlankId: fmt::Debug"))]
 pub enum ResourceInterpretation<'a, I: Interpretation, V: Vocabulary> {
 	/// Interpreted resource.
 	Interpreted(&'a I::Resource),
@@ -46,10 +44,7 @@ impl<'a, I: Interpretation, V: Vocabulary> ResourceInterpretation<'a, I, V> {
 		interpretation: &'a I,
 	) -> Option<CowRdfTerm<'a, V>>
 	where
-		V::Value: AsRdfLiteral<V>,
-		I: ReverseIriInterpretation<Iri = V::Iri>
-			+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-			+ ReverseLiteralInterpretation<Literal = V::Literal>,
+		I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	{
 		match self {
 			Self::Interpreted(r) => {
@@ -59,7 +54,7 @@ impl<'a, I: Interpretation, V: Vocabulary> ResourceInterpretation<'a, I, V> {
 
 				if let Some(l) = interpretation.literals_of(r).next() {
 					let l = vocabulary.literal(l).unwrap();
-					let term = match l.value().as_rdf_literal(vocabulary, l.type_()) {
+					let term = match l.value.as_rdf_literal(vocabulary, l.type_) {
 						crate::CowRdfLiteral::Borrowed(l) => CowRdfTerm::Borrowed(Term::Literal(l)),
 						crate::CowRdfLiteral::Owned(l) => CowRdfTerm::Owned(Term::Literal(l)),
 					};
@@ -101,10 +96,7 @@ pub trait LinkedDataResource<I: Interpretation = (), V: Vocabulary = ()> {
 		interpretation: &'a mut I,
 	) -> Option<CowRdfTerm<'a, V>>
 	where
-		V::Value: AsRdfLiteral<V>,
-		I: ReverseIriInterpretation<Iri = V::Iri>
-			+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-			+ ReverseLiteralInterpretation<Literal = V::Literal>,
+		I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	{
 		self.interpretation(vocabulary, interpretation)
 			.into_lexical_representation(vocabulary, interpretation)
@@ -258,21 +250,14 @@ impl<
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation, S: AsRef<str>> LinkedDataResource<I, V>
-	for rdf_types::Literal<rdf_types::literal::Type<V::Iri, V::LanguageTag>, S>
-{
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for rdf_types::Literal<V::Iri> {
 	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
 	) -> ResourceInterpretation<I, V> {
-		let ty = match self.type_() {
-			rdf_types::literal::Type::Any(i) => rdf_types::literal::Type::Any(i),
-			rdf_types::literal::Type::LangString(l) => rdf_types::literal::Type::LangString(l),
-		};
-
 		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(
-			crate::RdfLiteralRef::Any(self.value().as_ref(), ty),
+			crate::RdfLiteralRef::Any(self.value.as_ref(), self.type_.as_ref()),
 		))))
 	}
 }

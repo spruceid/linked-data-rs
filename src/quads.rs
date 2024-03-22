@@ -1,17 +1,21 @@
 use educe::Educe;
 use iref::IriBuf;
 use rdf_types::{
-	interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankIdInterpretationMut, ExportedFromVocabulary, Generator, Id, InsertIntoVocabulary,
-	Interpretation, InterpretationMut, IriInterpretationMut, IriVocabularyMut,
-	LiteralInterpretationMut, LiteralVocabularyMut, Quad, ReverseLiteralInterpretation,
-	ReverseTermInterpretation, Term, Vocabulary,
+	interpretation::{
+		self, BlankIdInterpretationMut, IriInterpretationMut, LiteralInterpretationMut,
+		ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseTermInterpretation,
+		TermInterpretationMut,
+	},
+	vocabulary::{
+		EmbedIntoVocabulary, ExtractedFromVocabulary, IriVocabularyMut, LiteralVocabularyMut,
+	},
+	Generator, Id, Interpretation, InterpretationMut, Quad, Term, Vocabulary,
 };
 
 use crate::{
 	CowRdfTerm, GraphVisitor, InterpretedQuad, LinkedData, LinkedDataGraph, LinkedDataResource,
-	LinkedDataSubject, PredicateObjectsVisitor, RdfId, RdfLiteralType, RdfLiteralValue, RdfQuad,
-	ResourceInterpretation, SubjectVisitor, Visitor,
+	LinkedDataSubject, PredicateObjectsVisitor, RdfId, RdfQuad, ResourceInterpretation,
+	SubjectVisitor, Visitor,
 };
 
 pub fn to_interpreted_quads<I: Interpretation, V: Vocabulary>(
@@ -20,17 +24,11 @@ pub fn to_interpreted_quads<I: Interpretation, V: Vocabulary>(
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
-	I: InterpretationMut<V>
-		+ IriInterpretationMut<V::Iri>
-		+ BlankIdInterpretationMut<V::BlankId>
-		+ LiteralInterpretationMut<V::Literal>,
+	I: InterpretationMut<V> + TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
 	I::Resource: Clone,
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
 {
 	value.visit(QuadSerializer {
 		vocabulary,
@@ -55,9 +53,6 @@ where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
 {
 	let mut result = Vec::new();
 
@@ -92,9 +87,6 @@ where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
 {
 	let mut result = Vec::new();
 
@@ -118,13 +110,11 @@ pub fn to_lexical_quads_with<I: Interpretation, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
-) -> Result<Vec<Quad>, IntoQuadsError>
+) -> Result<Vec<RdfQuad>, IntoQuadsError>
 where
 	I: InterpretationMut<V>
-		+ ReverseIriInterpretation<Iri = V::Iri>
-		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ ReverseLiteralInterpretation<Literal = V::Literal>,
-	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	let mut domain = LexicalDomain;
 
@@ -141,14 +131,12 @@ pub fn to_lexical_subject_quads_with<I: Interpretation, V: Vocabulary>(
 	interpretation: &mut I,
 	graph: Option<&Id>,
 	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
-) -> Result<(Id, Vec<Quad>), IntoQuadsError>
+) -> Result<(Id, Vec<RdfQuad>), IntoQuadsError>
 where
 	I: InterpretationMut<V>
-		+ ReverseIriInterpretation<Iri = V::Iri>
-		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	I::Resource: Clone,
-	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	let mut result = Vec::new();
 
@@ -170,7 +158,7 @@ where
 pub fn to_lexical_quads<G: Generator>(
 	generator: G,
 	value: &impl LinkedData<interpretation::WithGenerator<G>>,
-) -> Result<Vec<Quad>, IntoQuadsError> {
+) -> Result<Vec<RdfQuad>, IntoQuadsError> {
 	let mut interpretation = rdf_types::interpretation::WithGenerator::new((), generator);
 	to_lexical_quads_with(&mut (), &mut interpretation, value)
 }
@@ -180,7 +168,7 @@ pub fn to_lexical_subject_quads<G: Generator>(
 	graph: Option<&Id>,
 	value: &(impl LinkedDataSubject<interpretation::WithGenerator<G>>
 	      + LinkedDataResource<interpretation::WithGenerator<G>>),
-) -> Result<(Id, Vec<Quad>), IntoQuadsError> {
+) -> Result<(Id, Vec<RdfQuad>), IntoQuadsError> {
 	let mut interpretation = rdf_types::interpretation::WithGenerator::new((), generator);
 	to_lexical_subject_quads_with(&mut (), &mut interpretation, graph, value)
 }
@@ -195,12 +183,7 @@ where
 	V::BlankId: Clone,
 	V::Iri: Clone,
 	V::Literal: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
-	I: ReverseIriInterpretation<Iri = V::Iri>
-		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	let mut domain = VocabularyDomain;
 
@@ -215,7 +198,7 @@ where
 pub fn to_quads<G: Generator>(
 	generator: G,
 	value: &impl LinkedData<interpretation::WithGenerator<G>>,
-) -> Result<Vec<Quad>, IntoQuadsError> {
+) -> Result<Vec<RdfQuad>, IntoQuadsError> {
 	let mut interpretation = interpretation::WithGenerator::new((), generator);
 	to_quads_with(&mut (), &mut interpretation, value)
 }
@@ -345,12 +328,7 @@ where
 	V::Iri: Clone,
 	V::BlankId: Clone,
 	V::Literal: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
-	I: ReverseIriInterpretation<Iri = V::Iri>
-		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ ReverseLiteralInterpretation<Literal = V::Literal>,
+	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	type Subject = RdfId<V>;
 	type Predicate = V::Iri;
@@ -420,11 +398,11 @@ where
 				let term = match u {
 					Some(CowRdfTerm::Owned(Term::Id(id))) => Term::Id(id),
 					Some(CowRdfTerm::Owned(Term::Literal(l))) => {
-						Term::Literal(l.insert_into_vocabulary(vocabulary))
+						Term::Literal(l.embed_into_vocabulary(vocabulary))
 					}
 					Some(CowRdfTerm::Borrowed(Term::Id(id))) => Term::Id(id.cloned()),
 					Some(CowRdfTerm::Borrowed(Term::Literal(l))) => {
-						Term::Literal(l.into_owned().insert_into_vocabulary(vocabulary))
+						Term::Literal(l.into_owned().embed_into_vocabulary(vocabulary))
 					}
 					None => {
 						let r = interpretation.new_resource(vocabulary);
@@ -522,9 +500,6 @@ where
 	V: IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
-	V::Value: RdfLiteralValue,
-	V::Type: RdfLiteralType<V>,
-	V::LanguageTag: Clone,
 {
 	type Subject = I::Resource;
 	type Predicate = I::Resource;
@@ -601,12 +576,12 @@ where
 					Ok(interpretation.interpret_blank_id(b.clone()))
 				}
 				Some(CowRdfTerm::Owned(Term::Literal(l))) => {
-					let l = l.insert_into_vocabulary(vocabulary);
+					let l = l.embed_into_vocabulary(vocabulary);
 					let l = interpretation.interpret_literal(l);
 					Ok(l)
 				}
 				Some(CowRdfTerm::Borrowed(Term::Literal(l))) => {
-					let l = l.into_owned().insert_into_vocabulary(vocabulary);
+					let l = l.into_owned().embed_into_vocabulary(vocabulary);
 					let l = interpretation.interpret_literal(l);
 					Ok(l)
 				}
@@ -711,7 +686,7 @@ fn resource_lexical_term<V: Vocabulary, I>(
 	r: &I::Resource,
 ) -> Result<Term<Id, rdf_types::Literal>, IntoQuadsError>
 where
-	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	if let Some(iri) = interpretation.iris_of(r).next() {
@@ -733,10 +708,8 @@ where
 
 impl<I: InterpretationMut<V>, V: Vocabulary> Domain<I, V> for LexicalDomain
 where
-	I: ReverseIriInterpretation<Iri = V::Iri>
-		+ ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ ReverseLiteralInterpretation<Literal = V::Literal>,
-	V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	type Subject = Id;
 	type Predicate = IriBuf;

@@ -1,6 +1,7 @@
 use rdf_types::{
-	Interpretation, IriVocabulary, LanguageTagVocabulary, LiteralVocabulary,
-	ReverseIriInterpretation, ReverseLiteralInterpretation, Vocabulary, RDF_LANG_STRING,
+	interpretation::{ReverseIriInterpretation, ReverseLiteralInterpretation},
+	vocabulary::LiteralVocabulary,
+	Interpretation, Vocabulary, RDF_LANG_STRING,
 };
 
 use crate::{
@@ -13,32 +14,28 @@ macro_rules! deserialize_datatype {
 		$(
 			impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for $ty
 			where
-				V: LiteralVocabulary<Type = rdf_types::literal::Type<
-					<V as IriVocabulary>::Iri,
-					<V as LanguageTagVocabulary>::LanguageTag,
-				>>,
-				V::Value: AsRef<str>,
+				V: LiteralVocabulary,
 				I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>
 			{
 				fn deserialize_subject_in<D>(
 					vocabulary: &V,
 					interpretation: &I,
 					_dataset: &D,
-					_graph: &D::Graph,
+					_graph: Option<&I::Resource>,
 					resource: &I::Resource,
 					context: Context<I>
 				) -> Result<Self, FromLinkedDataError>
 				where
-					D: grdf::Dataset<Subject = I::Resource, Predicate = I::Resource, Object = I::Resource, GraphLabel = I::Resource>
+					D: rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
 				{
 					let mut literal_ty = None;
 					for l in interpretation.literals_of(resource) {
 						let l = vocabulary.literal(l).unwrap();
-						match l.type_() {
-							rdf_types::literal::Type::Any(ty_iri) => {
+						match l.type_ {
+							rdf_types::LiteralTypeRef::Any(ty_iri) => {
 								let ty_iri = vocabulary.iri(ty_iri).unwrap();
 								if ty_iri == xsd_types::$iri {
-									return match l.value().as_ref().parse() {
+									return match l.value.parse() {
 										Ok(value) => Ok(value),
 										Err(_) => Err(FromLinkedDataError::InvalidLiteral(
 											context.into_iris(
@@ -51,7 +48,7 @@ macro_rules! deserialize_datatype {
 
 								literal_ty = Some(ty_iri)
 							}
-							rdf_types::literal::Type::LangString(_) => {
+							rdf_types::LiteralTypeRef::LangString(_) => {
 								literal_ty = Some(RDF_LANG_STRING)
 							}
 						}
@@ -76,24 +73,20 @@ macro_rules! deserialize_datatype {
 
 			impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V> for $ty
 			where
-				V: LiteralVocabulary<Type = rdf_types::literal::Type<
-					<V as IriVocabulary>::Iri,
-					<V as LanguageTagVocabulary>::LanguageTag,
-				>>,
-				V::Value: AsRef<str>,
+				V: LiteralVocabulary,
 				I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>
 			{
 				fn deserialize_objects_in<'a, D>(
 					vocabulary: &V,
 					interpretation: &I,
 					dataset: &D,
-					graph: &D::Graph,
+					graph: Option<&I::Resource>,
 					objects: impl IntoIterator<Item = &'a <I as Interpretation>::Resource>,
 					context: Context<I>
 				) -> Result<Self, FromLinkedDataError>
 				where
 					<I as Interpretation>::Resource: 'a,
-					D: grdf::Dataset<Subject = <I as Interpretation>::Resource, Predicate = <I as Interpretation>::Resource, Object = <I as Interpretation>::Resource, GraphLabel = <I as Interpretation>::Resource>
+					D: rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
 				{
 					let mut error = None;
 

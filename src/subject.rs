@@ -1,7 +1,10 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{
-	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankId, BlankIdBuf, Id, Interpretation, ReverseIdInterpretation, Vocabulary,
+	dataset::PatternMatchingDataset,
+	interpretation::{
+		ReverseBlankIdInterpretation, ReverseIdInterpretation, ReverseIriInterpretation,
+	},
+	BlankId, BlankIdBuf, Id, Interpretation, Vocabulary,
 };
 
 use crate::{
@@ -171,32 +174,22 @@ pub trait LinkedDataDeserializeSubject<I: Interpretation = (), V: Vocabulary = (
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		resource: &I::Resource,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>;
+		D: PatternMatchingDataset<Resource = I::Resource>;
 
 	fn deserialize_subject<D>(
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		resource: &I::Resource,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		Self::deserialize_subject_in(
 			vocabulary,
@@ -217,17 +210,12 @@ where
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
-		_graph: &D::Graph,
+		_graph: Option<&I::Resource>,
 		resource: &I::Resource,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		match interpretation.iris_of(resource).next() {
 			Some(i) => {
@@ -250,17 +238,12 @@ where
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
-		_graph: &D::Graph,
+		_graph: Option<&I::Resource>,
 		resource: &I::Resource,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		match interpretation.blank_ids_of(resource).next() {
 			Some(b) => {
@@ -286,17 +269,12 @@ where
 		vocabulary: &V,
 		interpretation: &I,
 		_dataset: &D,
-		_graph: &D::Graph,
+		_graph: Option<&I::Resource>,
 		resource: &I::Resource,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		match interpretation.ids_of(resource).next() {
 			Some(Id::Iri(i)) => {
@@ -322,17 +300,12 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializeSubject<I, V>>
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		resource: &I::Resource,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		T::deserialize_subject_in(
 			vocabulary,

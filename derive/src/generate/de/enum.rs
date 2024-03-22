@@ -48,7 +48,7 @@ pub fn generate(
 										interpretation_,
 										dataset_,
 										graph_,
-										<D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate),
+										::linked_data::rdf_types::dataset::PatternMatchingDataset::quad_objects(dataset_, graph_, resource_, &predicate),
 										context_
 									);
 
@@ -76,7 +76,7 @@ pub fn generate(
 						quote! {
 							match vocabulary_.get(unsafe { ::linked_data::iref::Iri::new_unchecked(#iri) }).and_then(|iri| interpretation_.iri_interpretation(&iri)) {
 								Some(predicate) => {
-									let mut objects = <D_::Graph as ::linked_data::grdf::Graph>::objects(graph_, resource_, &predicate);
+									let mut objects = ::linked_data::rdf_types::dataset::PatternMatchingDataset::quad_objects(dataset_, graph_, resource_, &predicate);
 
 									let result = match objects.next() {
 										Some(resource_) => {
@@ -125,7 +125,14 @@ pub fn generate(
 				}
 			}
 			None => match variant_shape(&v.fields) {
-				VariantShape::Simple(_ty) => {
+				VariantShape::Simple(ty) => {
+					bounds.push(
+						syn::parse2(
+							quote!(#ty: ::linked_data::LinkedDataDeserializeSubject<I_, V_>),
+						)
+						.unwrap(),
+					);
+
 					quote! {
 						let result = ::linked_data::LinkedDataDeserializeSubject::deserialize_subject_in(
 							vocabulary_,
@@ -137,7 +144,7 @@ pub fn generate(
 						);
 
 						match result {
-							Ok(value) => return Ok(value),
+							Ok(value) => return Ok(Self::#v_ident(value)),
 							Err(e) => error = Some(e)
 						}
 					}
@@ -182,12 +189,12 @@ pub fn generate(
 				vocabulary_: &V_,
 				interpretation_: &I_,
 				dataset_: &D_,
-				graph_: &D_::Graph,
+				graph_: Option<&I_::Resource>,
 				resource_: &I_::Resource,
 				outer_context_: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
-				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+				D_: ::linked_data::rdf_types::dataset::PatternMatchingDataset<Resource = I_::Resource>
 			{
 				let context_ = outer_context_.with_subject(resource_);
 				let mut error = None;
@@ -210,13 +217,13 @@ pub fn generate(
 				vocabulary: &V_,
 				interpretation: &I_,
 				dataset: &D_,
-				graph: &D_::Graph,
+				graph: Option<&I_::Resource>,
 				objects: impl IntoIterator<Item = &'de_ I_::Resource>,
 				context: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
 				I_::Resource: 'de_,
-				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+				D_: ::linked_data::rdf_types::dataset::PatternMatchingDataset<Resource = I_::Resource>
 			{
 				let mut objects = objects.into_iter();
 

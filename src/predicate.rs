@@ -1,8 +1,11 @@
 use iref::{Iri, IriBuf};
 use rdf_types::{
-	interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-	BlankId, BlankIdBuf, BlankIdVocabularyMut, Id, Interpretation, IriVocabularyMut,
-	ReverseIdInterpretation, Vocabulary,
+	dataset::PatternMatchingDataset,
+	interpretation::{
+		ReverseBlankIdInterpretation, ReverseIdInterpretation, ReverseIriInterpretation,
+	},
+	vocabulary::{BlankIdVocabularyMut, IriVocabularyMut},
+	BlankId, BlankIdBuf, Id, Interpretation, Vocabulary,
 };
 
 use crate::{
@@ -179,34 +182,24 @@ pub trait LinkedDataDeserializePredicateObjects<I: Interpretation = (), V: Vocab
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>;
+		D: PatternMatchingDataset<Resource = I::Resource>;
 
 	fn deserialize_objects<'a, D>(
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		Self::deserialize_objects_in(
 			vocabulary,
@@ -225,18 +218,13 @@ macro_rules! deserialize_single_object {
 			vocabulary: &V,
 			interpretation: &I,
 			dataset: &D,
-			graph: &D::Graph,
+			graph: Option<&I::Resource>,
 			objects: impl IntoIterator<Item = &'a I::Resource>,
 			context: $crate::Context<I>,
 		) -> Result<Self, FromLinkedDataError>
 		where
 			I::Resource: 'a,
-			D: grdf::Dataset<
-				Subject = I::Resource,
-				Predicate = I::Resource,
-				Object = I::Resource,
-				GraphLabel = I::Resource,
-			>,
+			D: PatternMatchingDataset<Resource = I::Resource>,
 		{
 			use crate::LinkedDataDeserializeSubject;
 			let mut objects = objects.into_iter();
@@ -293,18 +281,13 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataDeserializePredicateObjects<
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		T::deserialize_objects_in(vocabulary, interpretation, dataset, graph, objects, context)
 			.map(Box::new)
@@ -320,18 +303,13 @@ where
 		vocabulary: &V,
 		interpretation: &I,
 		dataset: &D,
-		graph: &D::Graph,
+		graph: Option<&I::Resource>,
 		objects: impl IntoIterator<Item = &'a I::Resource>,
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>
 	where
 		I::Resource: 'a,
-		D: grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		D: PatternMatchingDataset<Resource = I::Resource>,
 	{
 		let mut objects = objects.into_iter();
 		match objects.next() {

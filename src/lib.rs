@@ -27,7 +27,9 @@
 //!   email: "john.smith@example.org".to_owned()
 //! };
 //!
-//! let quads = linked_data::to_quads(rdf_types::generator::Blank::new(), &value).expect("RDF serialization failed");
+//! let quads = linked_data::to_quads(rdf_types::generator::Blank::new(), &value)
+//!   .expect("RDF serialization failed");
+//!
 //! for quad in quads {
 //!   use rdf_types::RdfDisplay;
 //!   println!("{} .", quad.rdf_display())
@@ -43,7 +45,12 @@ use educe::Educe;
 use iref::{Iri, IriBuf};
 #[cfg(feature = "derive")]
 pub use linked_data_derive::{Deserialize, Serialize};
-use rdf_types::{Interpretation, IriVocabulary, ReverseIriInterpretation, Vocabulary};
+use rdf_types::{
+	dataset::{PatternMatchingDataset, TraversableDataset},
+	interpretation::ReverseIriInterpretation,
+	vocabulary::IriVocabulary,
+	Interpretation, Vocabulary,
+};
 
 #[doc(hidden)]
 pub use iref;
@@ -56,9 +63,6 @@ pub use xsd_types;
 
 #[doc(hidden)]
 pub use json_syntax;
-
-#[doc(hidden)]
-pub use grdf;
 
 mod anonymous;
 mod datatypes;
@@ -353,24 +357,14 @@ pub trait LinkedDataDeserialize<V: Vocabulary = (), I: Interpretation = ()>: Siz
 	fn deserialize_dataset_in(
 		vocabulary: &V,
 		interpretation: &I,
-		dataset: &impl grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		dataset: &(impl TraversableDataset<Resource = I::Resource> + PatternMatchingDataset),
 		context: Context<I>,
 	) -> Result<Self, FromLinkedDataError>;
 
 	fn deserialize_dataset(
 		vocabulary: &V,
 		interpretation: &I,
-		dataset: &impl grdf::Dataset<
-			Subject = I::Resource,
-			Predicate = I::Resource,
-			Object = I::Resource,
-			GraphLabel = I::Resource,
-		>,
+		dataset: &(impl TraversableDataset<Resource = I::Resource> + PatternMatchingDataset),
 	) -> Result<Self, FromLinkedDataError> {
 		Self::deserialize_dataset_in(vocabulary, interpretation, dataset, Context::default())
 	}

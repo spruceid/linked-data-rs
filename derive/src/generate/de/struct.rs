@@ -31,12 +31,12 @@ pub fn generate(
 				vocabulary_: &V_,
 				interpretation_: &I_,
 				dataset_: &D_,
-				graph_: &D_::Graph,
+				graph_: Option<&I_::Resource>,
 				resource_: &I_::Resource,
 				context_: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
-				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+				D_: ::linked_data::rdf_types::dataset::PatternMatchingDataset<Resource = I_::Resource>
 			{
 				let context_ = context_.with_subject(resource_);
 				#(#deserialize_fields)*
@@ -49,13 +49,13 @@ pub fn generate(
 				vocabulary: &V_,
 				interpretation: &I_,
 				dataset: &D_,
-				graph: &D_::Graph,
+				graph: Option<&I_::Resource>,
 				objects: impl IntoIterator<Item = &'de_ I_::Resource>,
 				context: ::linked_data::Context<I_>
 			) -> Result<Self, ::linked_data::FromLinkedDataError>
 			where
 				I_::Resource: 'de_,
-				D_: ::linked_data::grdf::Dataset<Subject = I_::Resource, Predicate = I_::Resource, Object = I_::Resource, GraphLabel = I_::Resource>
+				D_: ::linked_data::rdf_types::dataset::PatternMatchingDataset<Resource = I_::Resource>
 			{
 				let mut objects = objects.into_iter();
 

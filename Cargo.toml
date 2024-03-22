@@ -1,14 +1,47 @@
+[package]
+name = "linked-data"
+authors = ["Spruce Systems, Inc."]
+license = "MIT/Apache-2.0"
+description = "Linked-Data dateset serialization/deserialization traits"
+categories = ["encoding", "web-programming"]
+keywords = ["semantic-web", "linked-data", "rdf", "serialization"]
+repository = "https://github.com/spruceid/linked-data-rs"
+edition = "2021"
+rust-version = "1.71.1"
+version = "0.1.0"
+
+[features]
+default = ["derive", "serde"]
+derive = ["linked-data-derive"]
+
+[dependencies]
+rdf-types = "0.22.0"
+xsd-types = "0.9.2"
+static-iref = "3.0"
+json-syntax = { version = "0.12.2", features = ["canonicalize"] }
+educe = "0.4.22"
+im = "15.1.0"
+iref.workspace = true
+thiserror.workspace = true
+linked-data-derive = { workspace = true, optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[dev-dependencies]
+json-syntax = { version = "0.12.2", features = ["serde"] }
+
+[[example]]
+name = "derive"
+required-features = ["derive"]
+
 [workspace]
 members = [
-	"linked-data",
-	"linked-data-derive"
+	"derive"
 ]
 
 resolver = "2"
 
 [workspace.dependencies]
-linked-data = { version = "0.1", path = "linked-data" }
-linked-data-derive = { version = "0.1", path = "linked-data-derive" }
+linked-data-derive = { version = "0.1", path = "derive" }
 iref = "3.0"
 static-iref = "3.0"
 thiserror = "1.0.47"

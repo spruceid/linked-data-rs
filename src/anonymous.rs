@@ -1,5 +1,5 @@
 use iref::Iri;
-use rdf_types::{Interpretation, IriVocabularyMut, Vocabulary};
+use rdf_types::{vocabulary::IriVocabularyMut, Interpretation, Vocabulary};
 
 use crate::{
 	GraphVisitor, LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource,
