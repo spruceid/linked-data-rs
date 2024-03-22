@@ -1,10 +1,18 @@
 [package]
 name = "linked-data"
-authors = ["Spruce Systems, Inc."]
-license = "MIT/Apache-2.0"
 description = "Linked-Data dateset serialization/deserialization traits"
 categories = ["encoding", "web-programming"]
 keywords = ["semantic-web", "linked-data", "rdf", "serialization"]
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[workspace.package]
+authors = ["Spruce Systems, Inc."]
+license = "MIT/Apache-2.0"
 repository = "https://github.com/spruceid/linked-data-rs"
 edition = "2021"
 rust-version = "1.71.1"
@@ -41,7 +49,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-linked-data-derive = { version = "0.1", path = "derive" }
+linked-data-derive = { version = "0.1.0", path = "derive" }
 iref = "3.0"
 static-iref = "3.0"
 thiserror = "1.0.47"
