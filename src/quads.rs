@@ -114,7 +114,6 @@ pub fn to_lexical_quads_with<I: Interpretation, V: Vocabulary>(
 where
 	I: InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	let mut domain = LexicalDomain;
 
@@ -136,7 +135,6 @@ where
 	I: InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	I::Resource: Clone,
-	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	let mut result = Vec::new();
 
@@ -686,7 +684,6 @@ fn resource_lexical_term<V: Vocabulary, I>(
 	r: &I::Resource,
 ) -> Result<Term<Id, rdf_types::Literal>, IntoQuadsError>
 where
-	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	if let Some(iri) = interpretation.iris_of(r).next() {
@@ -695,7 +692,12 @@ where
 	}
 
 	if let Some(lit) = interpretation.literals_of(r).next() {
-		return Ok(Term::Literal(lit.extracted_from_vocabulary(vocabulary)));
+		return Ok(Term::Literal(
+			vocabulary
+				.literal(lit)
+				.unwrap()
+				.extracted_from_vocabulary(vocabulary),
+		));
 	}
 
 	if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
@@ -709,7 +711,6 @@ where
 impl<I: InterpretationMut<V>, V: Vocabulary> Domain<I, V> for LexicalDomain
 where
 	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-	V::Literal: ExtractedFromVocabulary<V, Extracted = rdf_types::Literal>,
 {
 	type Subject = Id;
 	type Predicate = IriBuf;
