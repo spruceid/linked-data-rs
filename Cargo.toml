@@ -23,7 +23,7 @@ default = ["derive", "serde"]
 derive = ["linked-data-derive"]
 
 [dependencies]
-rdf-types = "0.22.0"
+rdf-types = "0.22.1"
 xsd-types = "0.9.2"
 static-iref = "3.0"
 json-syntax = { version = "0.12.2", features = ["canonicalize"] }

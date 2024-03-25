@@ -695,7 +695,7 @@ where
 	}
 
 	if let Some(lit) = interpretation.literals_of(r).next() {
-		return Ok(Term::Literal(lit.exported_from_vocabulary(vocabulary)));
+		return Ok(Term::Literal(lit.extracted_from_vocabulary(vocabulary)));
 	}
 
 	if let Some(blank_id) = interpretation.blank_ids_of(r).next() {
