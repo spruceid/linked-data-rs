@@ -228,50 +228,67 @@ fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttribute
 				syn::Meta::List(list) => {
 					let mut tokens = list.tokens.into_iter();
 
-					match tokens.next() {
-						Some(TokenTree::Ident(id)) => {
-							if id == "prefix" {
-								match tokens.next() {
-									Some(TokenTree::Group(g)) => {
-										let (prefix, suffix) =
-											parse_prefix_binding(g.stream(), span)?;
-										result.prefixes.insert(prefix, suffix);
+					while let Some(token) = tokens.next() {
+						match token {
+							TokenTree::Ident(id) => {
+								if id == "prefix" {
+									match tokens.next() {
+										Some(TokenTree::Group(g)) => {
+											let (prefix, suffix) =
+												parse_prefix_binding(g.stream(), span)?;
+											result.prefixes.insert(prefix, suffix);
+										}
+										Some(token) => {
+											return Err(Error::InvalidAttribute(
+												AttributeError::UnexpectedToken,
+												token.span(),
+											))
+										}
+										None => {
+											return Err(Error::InvalidAttribute(
+												AttributeError::MissingPrefixBinding,
+												span,
+											))
+										}
 									}
-									Some(token) => {
-										return Err(Error::InvalidAttribute(
-											AttributeError::UnexpectedToken,
-											token.span(),
-										))
-									}
-									None => {
-										return Err(Error::InvalidAttribute(
-											AttributeError::MissingPrefixBinding,
-											span,
-										))
-									}
-								}
-							} else if id == "type" {
-								match tokens.next() {
-									Some(TokenTree::Punct(p)) if p.as_char() == '=' => match tokens
-										.next()
-									{
-										Some(TokenTree::Literal(l)) => {
-											let span = l.span();
-											match syn::Lit::new(l) {
-												syn::Lit::Str(s) => match IriBuf::new(s.value()) {
-													Ok(iri) => {
-														result.type_ = Some(CompactIri(iri, span))
+								} else if id == "type" {
+									match tokens.next() {
+										Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
+											match tokens.next() {
+												Some(TokenTree::Literal(l)) => {
+													let span = l.span();
+													match syn::Lit::new(l) {
+														syn::Lit::Str(s) => {
+															match IriBuf::new(s.value()) {
+																Ok(iri) => {
+																	result.type_ =
+																		Some(CompactIri(iri, span))
+																}
+																Err(_) => return Err(
+																	Error::InvalidAttribute(
+																		AttributeError::InvalidType,
+																		span,
+																	),
+																),
+															}
+														}
+														_ => {
+															return Err(Error::InvalidAttribute(
+																AttributeError::InvalidType,
+																span,
+															))
+														}
 													}
-													Err(_) => {
-														return Err(Error::InvalidAttribute(
-															AttributeError::InvalidType,
-															span,
-														))
-													}
-												},
-												_ => {
+												}
+												Some(token) => {
 													return Err(Error::InvalidAttribute(
-														AttributeError::InvalidType,
+														AttributeError::UnexpectedToken,
+														token.span(),
+													))
+												}
+												None => {
+													return Err(Error::InvalidAttribute(
+														AttributeError::MissingType,
 														span,
 													))
 												}
@@ -289,34 +306,22 @@ fn read_type_attributes(attributes: Vec<syn::Attribute>) -> Result<TypeAttribute
 												span,
 											))
 										}
-									},
-									Some(token) => {
-										return Err(Error::InvalidAttribute(
-											AttributeError::UnexpectedToken,
-											token.span(),
-										))
 									}
-									None => {
-										return Err(Error::InvalidAttribute(
-											AttributeError::MissingType,
-											span,
-										))
-									}
+								} else {
+									return Err(Error::InvalidAttribute(
+										AttributeError::UnknownIdent,
+										id.span(),
+									));
 								}
-							} else {
+							}
+							TokenTree::Punct(p) if p.as_char() == ',' => {}
+							token => {
 								return Err(Error::InvalidAttribute(
-									AttributeError::UnknownIdent,
-									id.span(),
-								));
+									AttributeError::UnexpectedToken,
+									token.span(),
+								))
 							}
 						}
-						Some(token) => {
-							return Err(Error::InvalidAttribute(
-								AttributeError::UnexpectedToken,
-								token.span(),
-							))
-						}
-						None => return Err(Error::InvalidAttribute(AttributeError::Empty, span)),
 					}
 				}
 				_ => {
