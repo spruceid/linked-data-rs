@@ -15,8 +15,9 @@ impl<T> From<T> for Ref<T> {
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataResource<I, V>
-	for Ref<T>
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataResource<I, V> for Ref<T>
+where
+	T: LinkedDataResource<I, V>,
 {
 	fn interpretation(
 		&self,
@@ -28,44 +29,49 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataRe
 }
 
 impl<I: Interpretation, V: Vocabulary, T> LinkedDataSubject<I, V> for Ref<T> {
-	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: crate::SubjectVisitor<I, V>,
 	{
-		serializer.end()
+		visitor.end()
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataPredicateObjects<I, V>
-	for Ref<T>
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataPredicateObjects<I, V> for Ref<T>
+where
+	T: LinkedDataResource<I, V>,
 {
-	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: crate::PredicateObjectsVisitor<I, V>,
 	{
-		visitor.object(self)?;
+		visitor.visit_object(self)?;
 		visitor.end()
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataGraph<I, V>
-	for Ref<T>
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataGraph<I, V> for Ref<T>
+where
+	T: LinkedDataResource<I, V>,
 {
-	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_graph_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: crate::GraphVisitor<I, V>,
 	{
-		visitor.subject(self)?;
+		visitor.visit_subject(self)?;
 		visitor.end()
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedData<I, V> for Ref<T> {
-	fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+impl<I: Interpretation, V: Vocabulary, T> LinkedData<I, V> for Ref<T>
+where
+	T: LinkedDataResource<I, V>,
+{
+	fn accept_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: crate::Visitor<I, V>,
 	{
-		visitor.default_graph(self)?;
+		visitor.visit_default_graph(self)?;
 		visitor.end()
 	}
 }

@@ -18,19 +18,21 @@ use crate::{
 	SubjectVisitor, Visitor,
 };
 
-pub fn to_interpreted_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
-	I: InterpretationMut<V> + TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
-	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
+	I: Interpretation
+		+ InterpretationMut<V>
+		+ TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
+	I::Resource: Clone,
 {
-	value.visit(QuadSerializer {
+	value.accept_visitor(QuadSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut InterpretationDomain,
@@ -38,21 +40,22 @@ where
 	})
 }
 
-pub fn to_interpreted_subject_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_subject_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&I::Resource>,
 	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
+	V::Iri: Clone,
+	V::BlankId: Clone,
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
 	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
-	V::Iri: Clone,
-	V::BlankId: Clone,
 {
 	let mut result = Vec::new();
 
@@ -61,7 +64,7 @@ where
 		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(vocabulary),
 	};
 
-	value.visit_subject(QuadPropertiesSerializer {
+	value.accept_subject_visitor(QuadPropertiesSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut InterpretationDomain,
@@ -73,20 +76,21 @@ where
 	Ok((subject, result))
 }
 
-pub fn to_interpreted_graph_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_graph_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &(impl LinkedDataGraph<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
+	V::Iri: Clone,
+	V::BlankId: Clone,
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
 	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
-	V::Iri: Clone,
-	V::BlankId: Clone,
 {
 	let mut result = Vec::new();
 
@@ -95,7 +99,7 @@ where
 		ResourceInterpretation::Uninterpreted(_) => interpretation.new_resource(vocabulary),
 	};
 
-	value.visit_graph(QuadGraphSerializer {
+	value.accept_graph_visitor(QuadGraphSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut InterpretationDomain,
@@ -106,18 +110,20 @@ where
 	Ok((graph, result))
 }
 
-pub fn to_lexical_quads_with<I: Interpretation, V: Vocabulary>(
+pub fn to_lexical_quads_with<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<RdfQuad>, IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	V: Vocabulary,
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	let mut domain = LexicalDomain;
 
-	value.visit(QuadSerializer {
+	value.accept_visitor(QuadSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut domain,
@@ -125,14 +131,16 @@ where
 	})
 }
 
-pub fn to_lexical_subject_quads_with<I: Interpretation, V: Vocabulary>(
+pub fn to_lexical_subject_quads_with<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&Id>,
 	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(Id, Vec<RdfQuad>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	V: Vocabulary,
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	I::Resource: Clone,
 {
@@ -141,7 +149,7 @@ where
 	let i = value.interpretation(vocabulary, interpretation);
 	let subject = LexicalDomain.subject(vocabulary, interpretation, i)?;
 
-	value.visit_subject(QuadPropertiesSerializer {
+	value.accept_subject_visitor(QuadPropertiesSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut LexicalDomain,
@@ -171,21 +179,22 @@ pub fn to_lexical_subject_quads<G: Generator>(
 	to_lexical_subject_quads_with(&mut (), &mut interpretation, graph, value)
 }
 
-pub fn to_quads_with<I: InterpretationMut<V>, V: Vocabulary>(
+pub fn to_quads_with<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<RdfQuad<V>>, IntoQuadsError>
 where
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
 	V::Iri: Clone,
 	V::Literal: Clone,
+	I: InterpretationMut<V>,
 	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	let mut domain = VocabularyDomain;
 
-	value.visit(QuadSerializer {
+	value.accept_visitor(QuadSerializer {
 		vocabulary,
 		interpretation,
 		domain: &mut domain,
@@ -331,7 +340,13 @@ where
 	type Subject = RdfId<V>;
 	type Predicate = V::Iri;
 	type Object = Term<RdfId<V>, V::Literal>;
-	type ObjectRef<'a> = Term<&'a RdfId<V>, &'a V::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a RdfId<V>, &'a V::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -502,7 +517,13 @@ where
 	type Subject = I::Resource;
 	type Predicate = I::Resource;
 	type Object = I::Resource;
-	type ObjectRef<'a> = &'a I::Resource where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= &'a I::Resource
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -715,7 +736,13 @@ where
 	type Subject = Id;
 	type Predicate = IriBuf;
 	type Object = Term;
-	type ObjectRef<'a> = Term<&'a Id, &'a rdf_types::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a Id, &'a rdf_types::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -899,13 +926,13 @@ struct QuadSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> {
 	result: Vec<DomainQuad<I, V, D>>,
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> Visitor<I, V>
-	for QuadSerializer<'a, I, V, D>
+impl<I: Interpretation, V: Vocabulary, D: Domain<I, V>> Visitor<I, V>
+	for QuadSerializer<'_, I, V, D>
 {
 	type Ok = Vec<DomainQuad<I, V, D>>;
 	type Error = IntoQuadsError;
 
-	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + crate::LinkedDataGraph<I, V>,
 	{
@@ -917,10 +944,10 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> Visitor<I, V>
 			graph: None,
 		};
 
-		value.visit_graph(graph_serializer)
+		value.accept_graph_visitor(graph_serializer)
 	}
 
-	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataGraph<I, V>,
 	{
@@ -935,7 +962,7 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> Visitor<I, V>
 			graph: Some(&graph),
 		};
 
-		value.visit_graph(graph_serializer)
+		value.accept_graph_visitor(graph_serializer)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -951,13 +978,13 @@ struct QuadGraphSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>
 	graph: Option<&'a D::Subject>,
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> GraphVisitor<I, V>
-	for QuadGraphSerializer<'a, I, V, D>
+impl<I: Interpretation, V: Vocabulary, D: Domain<I, V>> GraphVisitor<I, V>
+	for QuadGraphSerializer<'_, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
-	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
@@ -975,7 +1002,7 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> GraphVisitor<I, V>
 			subject: SubjectOrObject::Subject(&term),
 		};
 
-		value.visit_subject(properties_serializer)
+		value.accept_subject_visitor(properties_serializer)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -1015,13 +1042,13 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectOrObject<'a, 
 	}
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
-	for QuadPropertiesSerializer<'a, I, V, D>
+impl<I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
+	for QuadPropertiesSerializer<'_, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
-	fn predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
+	fn visit_predicate<L, T>(&mut self, predicate: &L, value: &T) -> Result<(), Self::Error>
 	where
 		L: ?Sized + LinkedDataResource<I, V>,
 		T: ?Sized + crate::LinkedDataPredicateObjects<I, V>,
@@ -1043,10 +1070,10 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
 			predicate: term,
 		};
 
-		value.visit_objects(objects_serializer)
+		value.accept_objects_visitor(objects_serializer)
 	}
 
-	fn reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
+	fn visit_reverse_predicate<L, T>(&mut self, predicate: &L, subjects: &T) -> Result<(), Self::Error>
 	where
 		L: ?Sized + LinkedDataResource<I, V>,
 		T: ?Sized + crate::LinkedDataPredicateObjects<I, V>,
@@ -1068,10 +1095,10 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
 			predicate: term,
 		};
 
-		subjects.visit_objects(subjects_serializer)
+		subjects.accept_objects_visitor(subjects_serializer)
 	}
 
-	fn graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<I, V>,
 	{
@@ -1085,10 +1112,10 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
 			graph: Some(graph),
 		};
 
-		value.visit_graph(graph_serializer)
+		value.accept_graph_visitor(graph_serializer)
 	}
 
-	fn include<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_include<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
 	{
@@ -1097,7 +1124,7 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> SubjectVisitor<I, V>
 			.domain
 			.subject(self.vocabulary, self.interpretation, i)?;
 
-		value.visit_subject(QuadPropertiesSerializer {
+		value.accept_subject_visitor(QuadPropertiesSerializer {
 			vocabulary: self.vocabulary,
 			interpretation: self.interpretation,
 			domain: self.domain,
@@ -1124,13 +1151,13 @@ struct ObjectsSerializer<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> 
 	predicate: D::Predicate,
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
-	for ObjectsSerializer<'a, I, V, D>
+impl<I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
+	for ObjectsSerializer<'_, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
-	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
@@ -1147,7 +1174,7 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisi
 			subject: SubjectOrObject::Object(&term),
 		};
 
-		value.visit_subject(subject_serializer)?;
+		value.accept_subject_visitor(subject_serializer)?;
 		self.result.push(Quad(
 			self.subject.clone(),
 			self.predicate.clone(),
@@ -1172,13 +1199,13 @@ struct ReversePredicateSerializer<'a, I: Interpretation, V: Vocabulary, D: Domai
 	predicate: D::Predicate,
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
-	for ReversePredicateSerializer<'a, I, V, D>
+impl<I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisitor<I, V>
+	for ReversePredicateSerializer<'_, I, V, D>
 {
 	type Ok = ();
 	type Error = IntoQuadsError;
 
-	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_object<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + crate::LinkedDataSubject<I, V>,
 	{
@@ -1196,7 +1223,7 @@ impl<'a, I: Interpretation, V: Vocabulary, D: Domain<I, V>> PredicateObjectsVisi
 			subject: SubjectOrObject::Subject(&subject),
 		};
 
-		value.visit_subject(subject_serializer)?;
+		value.accept_subject_visitor(subject_serializer)?;
 		self.result.push(Quad(
 			subject,
 			self.predicate.clone(),

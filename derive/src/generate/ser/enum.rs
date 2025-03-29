@@ -212,7 +212,7 @@ pub fn generate(
 		}
 
 		impl #subject_impl_generics ::linked_data::LinkedDataSubject<I_, V_> for #ident #ty_generics #subject_where_clauses {
-			fn visit_subject<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_subject_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::SubjectVisitor<I_, V_>
 			{
@@ -223,7 +223,7 @@ pub fn generate(
 		}
 
 		impl #predicate_impl_generics ::linked_data::LinkedDataPredicateObjects<I_, V_> for #ident #ty_generics #predicate_where_clauses {
-			fn visit_objects<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_objects_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::PredicateObjectsVisitor<I_, V_>
 			{
@@ -234,7 +234,7 @@ pub fn generate(
 		}
 
 		impl #graph_impl_generics ::linked_data::LinkedDataGraph<I_, V_> for #ident #ty_generics #graph_where_clauses {
-			fn visit_graph<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_graph_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::GraphVisitor<I_, V_>
 			{
@@ -245,7 +245,7 @@ pub fn generate(
 		}
 
 		impl #dataset_impl_generics ::linked_data::LinkedData<I_, V_> for #ident #ty_generics #dataset_where_clauses {
-			fn visit<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::Visitor<I_, V_>
 			{
@@ -393,7 +393,7 @@ fn variant_visit_subject(
 					);
 
 					quote! {
-						visitor.predicate(
+						visitor.visit_predicate(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
 						)?;
@@ -408,7 +408,7 @@ fn variant_visit_subject(
 					vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 					quote! {
-						visitor.predicate(
+						visitor.visit_predicate(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
 						)?;
@@ -433,7 +433,7 @@ fn variant_visit_subject(
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedDataSubject<I_, V_>>::visit_subject(#id, visitor)
+					<#ty as ::linked_data::LinkedDataSubject<I_, V_>>::accept_subject_visitor(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
@@ -444,7 +444,7 @@ fn variant_visit_subject(
 				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .visit_subject(visitor)
+					#inner_id #input .accept_subject_visitor(visitor)
 				}
 			}
 			VariantShape::Unit => {
@@ -481,7 +481,7 @@ fn variant_visit_predicate(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).visit_objects(visitor)
+						).accept_objects_visitor(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
@@ -495,12 +495,12 @@ fn variant_visit_predicate(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).visit_objects(visitor)
+						).accept_objects_visitor(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						visitor.object(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.visit_object(::linked_data::iref::Iri::new(#iri).unwrap())?;
 						visitor.end()
 					}
 				}
@@ -516,7 +516,7 @@ fn variant_visit_predicate(
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedDataPredicateObjects<I_, V_>>::visit_objects(#id, visitor)
+					<#ty as ::linked_data::LinkedDataPredicateObjects<I_, V_>>::accept_objects_visitor(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
@@ -527,7 +527,7 @@ fn variant_visit_predicate(
 				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .visit_objects(visitor)
+					#inner_id #input .accept_objects_visitor(visitor)
 				}
 			}
 			VariantShape::Unit => {
@@ -564,7 +564,7 @@ fn variant_visit_graph(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).visit_graph(visitor)
+						).accept_graph_visitor(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
@@ -578,12 +578,12 @@ fn variant_visit_graph(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).visit_graph(visitor)
+						).accept_graph_visitor(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						visitor.subject(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.visit_subject(::linked_data::iref::Iri::new(#iri).unwrap())?;
 						visitor.end()
 					}
 				}
@@ -599,7 +599,7 @@ fn variant_visit_graph(
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedDataGraph<I_, V_>>::visit_graph(#id, visitor)
+					<#ty as ::linked_data::LinkedDataGraph<I_, V_>>::accept_graph_visitor(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
@@ -610,7 +610,7 @@ fn variant_visit_graph(
 				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .visit_graph(visitor)
+					#inner_id #input .accept_graph_visitor(visitor)
 				}
 			}
 			VariantShape::Unit => {
@@ -647,7 +647,7 @@ fn variant_serialize(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							#id
-						).visit(visitor)
+						).accept_visitor(visitor)
 					}
 				}
 				VariantShape::Compound(inner_ty) => {
@@ -661,12 +661,12 @@ fn variant_serialize(
 						::linked_data::AnonymousBinding(
 							::linked_data::iref::Iri::new(#iri).unwrap(),
 							&#inner_id #input
-						).visit(visitor)
+						).accept_visitor(visitor)
 					}
 				}
 				VariantShape::Unit => {
 					quote! {
-						visitor.default_graph(::linked_data::iref::Iri::new(#iri).unwrap())?;
+						visitor.visit_default_graph(::linked_data::iref::Iri::new(#iri).unwrap())?;
 						visitor.end()
 					}
 				}
@@ -682,7 +682,7 @@ fn variant_serialize(
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedData<I_, V_>>::visit(#id, visitor)
+					<#ty as ::linked_data::LinkedData<I_, V_>>::accept_visitor(#id, visitor)
 				}
 			}
 			VariantShape::Compound(inner_ty) => {
@@ -693,7 +693,7 @@ fn variant_serialize(
 				vocabulary_bounds.add(inner_ty.visit_vocabulary_bounds);
 
 				quote! {
-					#inner_id #input .visit(visitor)
+					#inner_id #input .accept_visitor(visitor)
 				}
 			}
 			VariantShape::Unit => {
@@ -854,7 +854,7 @@ fn variant_subject_type(
 		}
 
 		impl #visit_impl_generics ::linked_data::LinkedDataSubject<I_, V_> for #subject_id #ty_generics #visit_where_clauses {
-			fn visit_subject<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_subject_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::SubjectVisitor<I_, V_>
 			{
@@ -864,31 +864,31 @@ fn variant_subject_type(
 		}
 
 		impl #visit_impl_generics ::linked_data::LinkedDataPredicateObjects<I_, V_> for #subject_id #ty_generics #visit_where_clauses {
-			fn visit_objects<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_objects_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::PredicateObjectsVisitor<I_, V_>
 			{
-				visitor.object(self)?;
+				visitor.visit_object(self)?;
 				visitor.end()
 			}
 		}
 
 		impl #visit_impl_generics ::linked_data::LinkedDataGraph<I_, V_> for #subject_id #ty_generics #visit_where_clauses {
-			fn visit_graph<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_graph_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::GraphVisitor<I_, V_>
 			{
-				visitor.subject(self)?;
+				visitor.visit_subject(self)?;
 				visitor.end()
 			}
 		}
 
 		impl #visit_impl_generics ::linked_data::LinkedData<I_, V_> for #subject_id #ty_generics #visit_where_clauses {
-			fn visit<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::Visitor<I_, V_>
 			{
-				visitor.default_graph(self)?;
+				visitor.visit_default_graph(self)?;
 				visitor.end()
 			}
 		}

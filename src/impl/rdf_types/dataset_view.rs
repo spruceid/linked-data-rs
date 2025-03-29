@@ -11,14 +11,14 @@ use rdf_types::{
 	Dataset, Interpretation, Quad, Vocabulary,
 };
 
-impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V> for DatasetView<'a, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V> for DatasetView<'_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: SubjectTraversableDataset<Resource = I::Resource>
 		+ PredicateTraversableDataset
 		+ PatternMatchingDataset,
 {
-	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_graph_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: GraphVisitor<I, V>,
 	{
@@ -44,7 +44,7 @@ where
 		}
 
 		for subject in graph_subjects {
-			visitor.subject(&Subject::new(
+			visitor.visit_subject(&Subject::new(
 				self.dataset,
 				self.graph,
 				subject,
@@ -67,15 +67,15 @@ struct PredicateObjects<'d, 'v, D: Dataset> {
 	visited_graphs: &'v im::HashSet<&'d D::Resource>,
 }
 
-impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
-	for PredicateObjects<'d, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
+	for PredicateObjects<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: SubjectTraversableDataset<Resource = I::Resource>
 		+ PredicateTraversableDataset
 		+ PatternMatchingDataset,
 {
-	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: PredicateObjectsVisitor<I, V>,
 	{
@@ -83,7 +83,7 @@ where
 			.dataset
 			.quad_objects(self.graph, self.subject, self.predicate)
 		{
-			visitor.object(&Object {
+			visitor.visit_object(&Object {
 				dataset: self.dataset,
 				graph: self.graph,
 				object,
@@ -96,7 +96,7 @@ where
 	}
 }
 
-impl<'a, 'v, D, I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for Object<'a, 'v, D>
+impl<D, I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for Object<'_, '_, D>
 where
 	I::Resource: LinkedDataResource<I, V>,
 	D: Dataset<Resource = I::Resource>,
@@ -118,14 +118,14 @@ struct Object<'a, 'v, D: Dataset> {
 	visited_graphs: &'v im::HashSet<&'a D::Resource>,
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: SubjectTraversableDataset
 		+ PredicateTraversableDataset<Resource = I::Resource>
 		+ PatternMatchingDataset,
 {
-	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<I, V>,
 	{
@@ -196,7 +196,7 @@ where
 				.dataset
 				.quad_predicates_objects(self.graph, self.subject)
 			{
-				visitor.predicate(
+				visitor.visit_predicate(
 					predicate,
 					&PredicateObjects {
 						dataset: self.dataset,
@@ -212,7 +212,7 @@ where
 			if self.dataset.contains_named_graph(self.subject) {
 				let mut visited_graphs = self.visited_graphs.clone();
 				if visited_graphs.insert(self.subject).is_none() {
-					visitor.graph(&NamedGraphView {
+					visitor.visit_graph(&NamedGraphView {
 						dataset: self.dataset,
 						graph: self.subject,
 						visited_graphs: &visited_graphs,
@@ -225,7 +225,7 @@ where
 	}
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataResource<I, V> for Subject<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataResource<I, V> for Subject<'_, '_, D>
 where
 	I::Resource: LinkedDataResource<I, V>,
 	D: Dataset<Resource = I::Resource>,
@@ -239,14 +239,14 @@ where
 	}
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Subject<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Subject<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: SubjectTraversableDataset<Resource = I::Resource>
 		+ PredicateTraversableDataset
 		+ PatternMatchingDataset,
 {
-	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<I, V>,
 	{
@@ -254,7 +254,7 @@ where
 			.dataset
 			.quad_predicates_objects(self.graph, self.subject)
 		{
-			visitor.predicate(
+			visitor.visit_predicate(
 				predicate,
 				&PredicateObjects {
 					dataset: self.dataset,
@@ -277,8 +277,8 @@ struct NamedGraphView<'a, 'v, D: Dataset> {
 	visited_graphs: &'v im::HashSet<&'a D::Resource>,
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataResource<I, V>
-	for NamedGraphView<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataResource<I, V>
+	for NamedGraphView<'_, '_, D>
 where
 	I::Resource: LinkedDataResource<I, V>,
 	D: Dataset<Resource = I::Resource>,
@@ -292,15 +292,15 @@ where
 	}
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V>
-	for NamedGraphView<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V>
+	for NamedGraphView<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: SubjectTraversableDataset<Resource = I::Resource>
 		+ PredicateTraversableDataset
 		+ PatternMatchingDataset,
 {
-	fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_graph_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: GraphVisitor<I, V>,
 	{
@@ -322,7 +322,7 @@ where
 		}
 
 		for subject in graph_subjects {
-			visitor.subject(&Subject::new(
+			visitor.visit_subject(&Subject::new(
 				self.dataset,
 				Some(self.graph),
 				subject,

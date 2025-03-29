@@ -68,7 +68,7 @@ fn variant_compound_fields(
 				);
 
 				quote! {
-					<#ty as ::linked_data::LinkedDataSubject<I_, V_>>::visit_subject(#field_ref, &mut visitor)?;
+					<#ty as ::linked_data::LinkedDataSubject<I_, V_>>::accept_subject_visitor(#field_ref, &mut visitor)?;
 				}
 			} else {
 				match field_attrs.iri {
@@ -85,7 +85,7 @@ fn variant_compound_fields(
 							);
 
 							quote! {
-								visitor.predicate(
+								visitor.visit_predicate(
 									::linked_data::iref::Iri::new(#iri).unwrap(),
 									&Some(::linked_data::AnonymousGraph(#field_ref))
 								)?;
@@ -99,7 +99,7 @@ fn variant_compound_fields(
 							);
 
 							quote! {
-								visitor.predicate(
+								visitor.visit_predicate(
 									::linked_data::iref::Iri::new(#iri).unwrap(),
 									#field_ref
 								)?;

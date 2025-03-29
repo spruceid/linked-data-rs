@@ -78,7 +78,7 @@ pub enum CowRef<'a, T> {
 	Owned(T),
 }
 
-impl<'a, T> AsRef<T> for CowRef<'a, T> {
+impl<T> AsRef<T> for CowRef<'_, T> {
 	fn as_ref(&self) -> &T {
 		match self {
 			Self::Borrowed(t) => t,
@@ -87,7 +87,7 @@ impl<'a, T> AsRef<T> for CowRef<'a, T> {
 	}
 }
 
-impl<'a, T> Borrow<T> for CowRef<'a, T> {
+impl<T> Borrow<T> for CowRef<'_, T> {
 	fn borrow(&self) -> &T {
 		match self {
 			Self::Borrowed(t) => t,
@@ -150,7 +150,7 @@ pub trait AsRdfLiteral<V: IriVocabulary + LiteralVocabulary> {
 		&'a self,
 		vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V>;
+	) -> CowRdfLiteral<'a, V>;
 }
 
 impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for str {
@@ -158,7 +158,7 @@ impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for str {
 		&'a self,
 		_vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V> {
+	) -> CowRdfLiteral<'a, V> {
 		CowRdfLiteral::Borrowed(RdfLiteralRef::Any(self, ty))
 	}
 }
@@ -168,7 +168,7 @@ impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for String {
 		&'a self,
 		vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V> {
+	) -> CowRdfLiteral<'a, V> {
 		self.as_str().as_rdf_literal(vocabulary, ty)
 	}
 }
@@ -255,7 +255,7 @@ pub enum RdfLiteralRef<'a, V: IriVocabulary = ()> {
 	Json(&'a json_syntax::Value),
 }
 
-impl<'a, V: IriVocabulary> RdfLiteralRef<'a, V> {
+impl<V: IriVocabulary> RdfLiteralRef<'_, V> {
 	pub fn into_lexical(self, vocabulary: &V) -> rdf_types::Literal {
 		match self {
 			Self::Any(s, LiteralTypeRef::Any(ty)) => rdf_types::Literal::new(
@@ -294,7 +294,7 @@ pub enum CowRdfLiteral<'a, V: IriVocabulary = ()> {
 	Owned(RdfLiteral<V>),
 }
 
-impl<'a, V: IriVocabulary> CowRdfLiteral<'a, V> {
+impl<V: IriVocabulary> CowRdfLiteral<'_, V> {
 	pub fn into_owned(self) -> RdfLiteral<V>
 	where
 		V::Iri: Clone,

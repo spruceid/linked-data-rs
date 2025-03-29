@@ -36,7 +36,7 @@ pub fn generate(
 			let rdf_type = RDF_TYPE.as_str();
 
 			Ok(quote! {
-				visitor.predicate(
+				visitor.visit_predicate(
 					::linked_data::iref::Iri::new(#rdf_type).unwrap(),
 					::linked_data::iref::Iri::new(#iri).unwrap()
 				)?;
@@ -86,7 +86,7 @@ pub fn generate(
 		}
 
 		impl #impl_generics ::linked_data::LinkedDataSubject<I_, V_> for #ident #ty_generics #where_clause {
-			fn visit_subject<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_subject_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::SubjectVisitor<I_, V_>
 			{
@@ -96,31 +96,31 @@ pub fn generate(
 		}
 
 		impl #impl_generics ::linked_data::LinkedDataPredicateObjects<I_, V_> for #ident #ty_generics #where_clause {
-			fn visit_objects<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_objects_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::PredicateObjectsVisitor<I_, V_>
 			{
-				visitor.object(self)?;
+				visitor.visit_object(self)?;
 				visitor.end()
 			}
 		}
 
 		impl #impl_generics ::linked_data::LinkedDataGraph<I_, V_> for #ident #ty_generics #where_clause {
-			fn visit_graph<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_graph_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::GraphVisitor<I_, V_>
 			{
-				visitor.subject(self)?;
+				visitor.visit_subject(self)?;
 				visitor.end()
 			}
 		}
 
 		impl #impl_generics ::linked_data::LinkedData<I_, V_> for #ident #ty_generics #where_clause {
-			fn visit<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
+			fn accept_visitor<S_>(&self, mut visitor: S_) -> Result<S_::Ok, S_::Error>
 			where
 				S_: ::linked_data::Visitor<I_, V_>
 			{
-				visitor.default_graph(self)?;
+				visitor.visit_default_graph(self)?;
 				visitor.end()
 			}
 		}

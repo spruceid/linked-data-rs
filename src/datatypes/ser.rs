@@ -24,7 +24,7 @@ macro_rules! datatype {
 			}
 
 			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<I, V> for $ty {
-				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+				fn accept_subject_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 				where
 					S: crate::SubjectVisitor<I, V>
 				{
@@ -33,11 +33,11 @@ macro_rules! datatype {
 			}
 
 			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<I, V> for $ty {
-				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+				fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 				where
 					S: PredicateObjectsVisitor<I, V>,
 				{
-					visitor.object(self)?;
+					visitor.visit_object(self)?;
 					visitor.end()
 				}
 			}
@@ -61,7 +61,7 @@ macro_rules! unsized_datatype {
 			}
 
 			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataSubject<I, V> for $ty {
-				fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+				fn accept_subject_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 				where
 					S: crate::SubjectVisitor<I, V>
 				{
@@ -70,11 +70,11 @@ macro_rules! unsized_datatype {
 			}
 
 			impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation> LinkedDataPredicateObjects<I, V> for $ty {
-				fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+				fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 				where
 					S: PredicateObjectsVisitor<I, V>,
 				{
-					visitor.object(self)?;
+					visitor.visit_object(self)?;
 					visitor.end()
 				}
 			}
@@ -126,7 +126,7 @@ impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 	LinkedDataSubject<I, V> for xsd_types::AnyUriBuf
 {
-	fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: crate::SubjectVisitor<I, V>,
 	{
@@ -137,11 +137,11 @@ impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 	LinkedDataPredicateObjects<I, V> for xsd_types::AnyUriBuf
 {
-	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: PredicateObjectsVisitor<I, V>,
 	{
-		visitor.object(self)?;
+		visitor.visit_object(self)?;
 		visitor.end()
 	}
 }

@@ -9,12 +9,12 @@ use crate::{
 	ResourceInterpretation, SubjectVisitor,
 };
 
-impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for DatasetGraphView<'a, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for DatasetGraphView<'_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: PredicateTraversableDataset<Resource = I::Resource> + PatternMatchingDataset,
 {
-	fn visit_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<I, V>,
 	{
@@ -35,13 +35,13 @@ struct PredicateObjects<'d, 'v, D: Dataset> {
 	visited: &'v im::HashSet<&'d D::Resource>,
 }
 
-impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
-	for PredicateObjects<'d, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
+	for PredicateObjects<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: PredicateTraversableDataset<Resource = I::Resource> + PatternMatchingDataset,
 {
-	fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: PredicateObjectsVisitor<I, V>,
 	{
@@ -49,7 +49,7 @@ where
 			.dataset
 			.quad_objects(self.graph, self.subject, self.predicate)
 		{
-			visitor.object(&Object {
+			visitor.visit_object(&Object {
 				dataset: self.dataset,
 				graph: self.graph,
 				object,
@@ -61,8 +61,8 @@ where
 	}
 }
 
-impl<'a, 'v, I: Interpretation, V: Vocabulary, D: Dataset<Resource = I::Resource>>
-	LinkedDataResource<I, V> for Object<'a, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D: Dataset<Resource = I::Resource>> LinkedDataResource<I, V>
+	for Object<'_, '_, D>
 where
 	I::Resource: LinkedDataResource<I, V>,
 {
@@ -82,12 +82,12 @@ struct Object<'d, 'v, D: Dataset> {
 	visited: &'v im::HashSet<&'d D::Resource>,
 }
 
-impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'d, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'_, '_, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: PredicateTraversableDataset<Resource = I::Resource> + PatternMatchingDataset,
 {
-	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<I, V>,
 	{
@@ -145,7 +145,7 @@ impl<'d, 'v, D: PredicateTraversableDataset + PatternMatchingDataset> Subject<'d
 			.dataset
 			.quad_predicates_objects(self.graph, self.subject)
 		{
-			visitor.predicate(
+			visitor.visit_predicate(
 				predicate,
 				&PredicateObjects {
 					dataset: self.dataset,
@@ -161,12 +161,12 @@ impl<'d, 'v, D: PredicateTraversableDataset + PatternMatchingDataset> Subject<'d
 	}
 }
 
-impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Subject<'d, 'v, D>
+impl<I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Subject<'_, '_, D>
 where
 	D::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	D: PredicateTraversableDataset<Resource = I::Resource> + PatternMatchingDataset,
 {
-	fn visit_subject<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_subject_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: SubjectVisitor<I, V>,
 	{
@@ -175,7 +175,7 @@ where
 				.dataset
 				.quad_predicates_objects(self.graph, self.subject)
 			{
-				visitor.predicate(
+				visitor.visit_predicate(
 					predicate,
 					&PredicateObjects {
 						dataset: self.dataset,

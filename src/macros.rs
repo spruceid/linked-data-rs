@@ -19,11 +19,11 @@ macro_rules! json_literal {
 		}
 
 		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataPredicateObjects<I, V> for $ty {
-			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+			fn accept_objects_visitor<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: $crate::PredicateObjectsVisitor<I, V>,
 			{
-				visitor.object(self)?;
+				visitor.visit_object(self)?;
 				visitor.end()
 			}
 		}
@@ -66,7 +66,7 @@ macro_rules! json_literal {
 		}
 
 		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataSubject<I, V> for $ty {
-			fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+			fn accept_subject_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: $crate::SubjectVisitor<I, V>,
 			{

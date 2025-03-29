@@ -161,33 +161,37 @@ impl FromLinkedDataError {
 /// [`visit`](Self::visit) method.
 pub trait LinkedData<I: Interpretation = (), V: Vocabulary = ()> {
 	/// Visit the RDF dataset represented by this type.
-	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<I, V>;
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedData<I, V>> LinkedData<I, V>
-	for &'a T
+impl<I: Interpretation, V: Vocabulary, T> LinkedData<I, V> for &T
+where
+	T: ?Sized + LinkedData<I, V>,
 {
-	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<I, V>,
 	{
-		T::visit(self, visitor)
+		T::accept_visitor(self, visitor)
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedData<I, V>> LinkedData<I, V> for Box<T> {
-	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+impl<I: Interpretation, V: Vocabulary, T> LinkedData<I, V> for Box<T>
+where
+	T: ?Sized + LinkedData<I, V>,
+{
+	fn accept_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<I, V>,
 	{
-		T::visit(self, visitor)
+		T::accept_visitor(self, visitor)
 	}
 }
 
 impl<I: Interpretation, V: Vocabulary> LinkedData<I, V> for Iri {
-	fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+	fn accept_visitor<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
 		S: Visitor<I, V>,
 	{
@@ -205,12 +209,12 @@ pub trait Visitor<I: Interpretation = (), V: Vocabulary = ()> {
 	type Error;
 
 	/// Visits the default graph of the dataset.
-	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<I, V>;
 
 	/// Visits a named graph of the dataset.
-	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + LinkedDataGraph<I, V>;
 
@@ -219,22 +223,25 @@ pub trait Visitor<I: Interpretation = (), V: Vocabulary = ()> {
 }
 
 /// Any mutable reference to a visitor is itself a visitor.
-impl<'s, I: Interpretation, V: Vocabulary, S: Visitor<I, V>> Visitor<I, V> for &'s mut S {
+impl<I: Interpretation, V: Vocabulary, S> Visitor<I, V> for &mut S
+where
+	S: Visitor<I, V>,
+{
 	type Ok = ();
 	type Error = S::Error;
 
-	fn default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_default_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataGraph<I, V>,
 	{
-		S::default_graph(self, value)
+		S::visit_default_graph(self, value)
 	}
 
-	fn named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	fn visit_named_graph<T>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
 		T: ?Sized + LinkedDataResource<I, V> + LinkedDataGraph<I, V>,
 	{
-		S::named_graph(self, value)
+		S::visit_named_graph(self, value)
 	}
 
 	fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -250,7 +257,7 @@ pub enum ResourceOrIriRef<'a, I: Interpretation> {
 	Anonymous,
 }
 
-impl<'a, I: Interpretation> ResourceOrIriRef<'a, I> {
+impl<I: Interpretation> ResourceOrIriRef<'_, I> {
 	pub fn into_iri<V>(self, vocabulary: &V, interpretation: &I) -> Option<IriBuf>
 	where
 		V: IriVocabulary,
@@ -347,7 +354,7 @@ pub enum ContextIris {
 	},
 }
 
-impl<'a, I: Interpretation> Default for Context<'a, I> {
+impl<I: Interpretation> Default for Context<'_, I> {
 	fn default() -> Self {
 		Self::Subject
 	}

@@ -111,8 +111,8 @@ pub trait LinkedDataResource<I: Interpretation = (), V: Vocabulary = ()> {
 	}
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataResource<I, V>>
-	LinkedDataResource<I, V> for &'a T
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataResource<I, V>>
+	LinkedDataResource<I, V> for &T
 {
 	fn interpretation(
 		&self,
@@ -161,7 +161,10 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for Anonymous {
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<I, V> for Iri {
+impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for Iri
+where
+	V: IriVocabularyMut,
+{
 	fn interpretation(
 		&self,
 		vocabulary: &mut V,
@@ -173,7 +176,10 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<I, 
 	}
 }
 
-impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<I, V> for IriBuf {
+impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for IriBuf
+where
+	V: IriVocabularyMut,
+{
 	fn interpretation(
 		&self,
 		vocabulary: &mut V,
@@ -185,20 +191,9 @@ impl<V: Vocabulary + IriVocabularyMut, I: Interpretation> LinkedDataResource<I, 
 	}
 }
 
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource<I, V> for BlankId {
-	fn interpretation(
-		&self,
-		vocabulary: &mut V,
-		_interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
-		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Id(Id::Blank(
-			vocabulary.insert_blank_id(self),
-		)))))
-	}
-}
-
-impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource<I, V>
-	for BlankIdBuf
+impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for BlankId
+where
+	V: BlankIdVocabularyMut,
 {
 	fn interpretation(
 		&self,
@@ -211,12 +206,25 @@ impl<V: Vocabulary + BlankIdVocabularyMut, I: Interpretation> LinkedDataResource
 	}
 }
 
-impl<
-		V: Vocabulary,
-		I: Interpretation,
-		T: LinkedDataResource<I, V>,
-		B: LinkedDataResource<I, V>,
-	> LinkedDataResource<I, V> for Id<T, B>
+impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for BlankIdBuf
+where
+	V: BlankIdVocabularyMut,
+{
+	fn interpretation(
+		&self,
+		vocabulary: &mut V,
+		_interpretation: &mut I,
+	) -> ResourceInterpretation<I, V> {
+		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Id(Id::Blank(
+			vocabulary.insert_blank_id(self),
+		)))))
+	}
+}
+
+impl<I: Interpretation, V: Vocabulary, T, B> LinkedDataResource<I, V> for Id<T, B>
+where
+	T: LinkedDataResource<I, V>,
+	B: LinkedDataResource<I, V>,
 {
 	fn interpretation(
 		&self,
@@ -230,13 +238,11 @@ impl<
 	}
 }
 
-impl<
-		V: Vocabulary,
-		I: Interpretation,
-		T: LinkedDataResource<I, V>,
-		B: LinkedDataResource<I, V>,
-		L: LinkedDataResource<I, V>,
-	> LinkedDataResource<I, V> for Term<Id<T, B>, L>
+impl<I: Interpretation, V: Vocabulary, T, B, L> LinkedDataResource<I, V> for Term<Id<T, B>, L>
+where
+	T: LinkedDataResource<I, V>,
+	B: LinkedDataResource<I, V>,
+	L: LinkedDataResource<I, V>,
 {
 	fn interpretation(
 		&self,
@@ -250,7 +256,7 @@ impl<
 	}
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for rdf_types::Literal<V::Iri> {
+impl<I: Interpretation, V: Vocabulary> LinkedDataResource<I, V> for rdf_types::Literal<V::Iri> {
 	fn interpretation(
 		&self,
 		_vocabulary: &mut V,
@@ -262,8 +268,9 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for rdf_types::L
 	}
 }
 
-impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataResource<I, V>
-	for Option<T>
+impl<I: Interpretation, V: Vocabulary, T> LinkedDataResource<I, V> for Option<T>
+where
+	T: LinkedDataResource<I, V>,
 {
 	fn interpretation(
 		&self,
