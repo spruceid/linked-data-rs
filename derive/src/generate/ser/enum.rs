@@ -1,6 +1,6 @@
-use iref::{Iri, IriBuf};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
+use rdf_types::{Iri, IriBuf};
 use syn::{punctuated::Punctuated, spanned::Spanned};
 
 use crate::{

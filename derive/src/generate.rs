@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use iref::{InvalidIri, Iri, IriBuf};
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use static_iref::iri;
+use rdf_types::{iri, InvalidIri, Iri, IriBuf};
 
 use syn::{punctuated::Punctuated, spanned::Spanned};
 

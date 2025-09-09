@@ -1,1 +1,3 @@
-mod rdf_types;
+#[cfg(feature = "indexmap")]
+mod indexmap;
+// mod rdf_types;

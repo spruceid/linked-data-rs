@@ -19,37 +19,28 @@ rust-version = "1.71.1"
 version = "0.1.2"
 
 [features]
-default = ["derive", "serde"]
+default = ["indexmap"]
 derive = ["linked-data-derive"]
+indexmap = ["dep:indexmap"]
 
 [dependencies]
-rdf-types = "0.22.1"
-xsd-types = "0.9.2"
-static-iref = "3.0"
-json-syntax = { version = "0.12.2", features = ["canonicalize"] }
-educe = "0.4.22"
-im = "15.1.0"
-iref.workspace = true
-thiserror.workspace = true
-linked-data-derive = { workspace = true, optional = true }
-serde = { version = "1.0", features = ["derive"], optional = true }
+rdf-types.workspace = true
 
-[dev-dependencies]
-json-syntax = { version = "0.12.2", features = ["serde"] }
+# Derive macro.
+linked-data-derive = { workspace = true, optional = true }
+
+# Support for `indexmap`.
+indexmap = { version = "2.10.0", optional = true }
 
 [[example]]
 name = "derive"
 required-features = ["derive"]
 
 [workspace]
-members = [
-	"derive"
-]
+members = ["derive"]
 
 resolver = "2"
 
 [workspace.dependencies]
 linked-data-derive = { version = "0.1.0", path = "derive" }
-iref = "3.0"
-static-iref = "3.0"
-thiserror = "1.0.47"
+rdf-types.path = "/home/timothee/Projets/rdf/rdf-types/"
