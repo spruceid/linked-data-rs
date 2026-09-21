@@ -5,6 +5,10 @@
 //! # Example
 //!
 //! ```
+//! # #[cfg(not(feature = "derive"))]
+//! # fn main() {}
+//! # #[cfg(feature = "derive")]
+//! # fn main() {
 //! use iref::IriBuf;
 //! use static_iref::iri;
 //!
@@ -34,6 +38,7 @@
 //!   use rdf_types::RdfDisplay;
 //!   println!("{} .", quad.rdf_display())
 //! }
+//! # }
 //! ```
 //!
 //! This should print the following:

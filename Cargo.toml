@@ -40,6 +40,18 @@ json-syntax = { version = "0.12.2", features = ["serde"] }
 name = "derive"
 required-features = ["derive"]
 
+[[example]]
+name = "derive_enum"
+required-features = ["derive"]
+
+[[example]]
+name = "generics"
+required-features = ["derive"]
+
+[[example]]
+name = "graph"
+required-features = ["derive"]
+
 [workspace]
 members = [
 	"derive"

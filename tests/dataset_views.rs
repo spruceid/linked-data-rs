@@ -1,7 +1,10 @@
+use std::{cell::Cell, rc::Rc};
+
 use iref::IriBuf;
 use linked_data::{
-	to_lexical_quads, to_lexical_subject_quads, LinkedData, LinkedDataGraph, LinkedDataResource,
-	LinkedDataSubject, RdfQuad, ResourceInterpretation, SubjectVisitor, Visitor,
+	to_lexical_quads, to_lexical_subject_quads, LinkedData, LinkedDataGraph,
+	LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, PredicateObjectsVisitor,
+	RdfQuad, ResourceInterpretation, SubjectVisitor, Visitor,
 };
 use rdf_types::{
 	dataset::{DatasetGraphView, DatasetView, IndexedBTreeDataset},
@@ -88,6 +91,124 @@ fn lexical_quad(subject: &str, predicate: &str, object: &str, graph: Option<&str
 	)
 }
 
+macro_rules! ignore_non_predicate_subject_events {
+	() => {
+		fn reverse_predicate<L, T>(
+			&mut self,
+			_predicate: &L,
+			_subjects: &T,
+		) -> Result<(), Self::Error>
+		where
+			L: ?Sized + LinkedDataResource<I, V>,
+			T: ?Sized + LinkedDataPredicateObjects<I, V>,
+		{
+			Ok(())
+		}
+
+		fn graph<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+		where
+			T: ?Sized + LinkedDataGraph<I, V>,
+		{
+			Ok(())
+		}
+
+		fn include<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+		where
+			T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+		{
+			Ok(())
+		}
+
+		fn end(self) -> Result<Self::Ok, Self::Error> {
+			Ok(())
+		}
+	};
+}
+
+enum PredicateProbe {
+	Fail,
+	Count(Rc<Cell<usize>>),
+}
+
+impl<I: Interpretation, V: Vocabulary> SubjectVisitor<I, V> for PredicateProbe {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn predicate<L, T>(&mut self, _predicate: &L, _objects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
+	{
+		match self {
+			Self::Fail => Err("injected visitor failure"),
+			Self::Count(count) => {
+				count.set(count.get() + 1);
+				Ok(())
+			}
+		}
+	}
+
+	ignore_non_predicate_subject_events!();
+}
+
+struct FailThenRetryObjects {
+	failures: Rc<Cell<usize>>,
+	retried_predicates: Rc<Cell<usize>>,
+}
+
+impl<I: Interpretation, V: Vocabulary> PredicateObjectsVisitor<I, V> for FailThenRetryObjects {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+	{
+		let failure = value.visit_subject(PredicateProbe::Fail);
+		assert_eq!(failure, Err("injected visitor failure"));
+		self.failures.set(self.failures.get() + 1);
+
+		value.visit_subject(PredicateProbe::Count(Rc::clone(&self.retried_predicates)))
+	}
+
+	fn end(self) -> Result<Self::Ok, Self::Error> {
+		Ok(())
+	}
+}
+
+struct ProbeNestedObjectCleanup {
+	failures: Rc<Cell<usize>>,
+	retried_predicates: Rc<Cell<usize>>,
+}
+
+impl<I: Interpretation, V: Vocabulary> SubjectVisitor<I, V> for ProbeNestedObjectCleanup {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn predicate<L, T>(&mut self, _predicate: &L, objects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
+	{
+		objects.visit_objects(FailThenRetryObjects {
+			failures: Rc::clone(&self.failures),
+			retried_predicates: Rc::clone(&self.retried_predicates),
+		})
+	}
+
+	ignore_non_predicate_subject_events!();
+}
+
+fn probe_nested_object_cleanup<T>(
+	value: &T,
+	visitor: ProbeNestedObjectCleanup,
+) -> Result<(), &'static str>
+where
+	T: LinkedDataSubject<rdf_types::interpretation::WithGenerator<generator::Blank>, ()>,
+{
+	value.visit_subject(visitor)
+}
+
 #[test]
 fn dataset_view_terminates_named_graph_cycle_in_stable_order() {
 	const ROOT: &str = "https://example.com/root";
@@ -114,6 +235,89 @@ fn dataset_view_terminates_named_graph_cycle_in_stable_order() {
 			lexical_quad(NODE_B, EDGE, GRAPH_A, Some(GRAPH_B)),
 			lexical_quad(NODE_A, EDGE, GRAPH_B, Some(GRAPH_A)),
 			lexical_quad(ROOT, EDGE, GRAPH_A, None),
+		]
+	);
+}
+
+#[test]
+fn dataset_view_revisits_shared_named_graph_per_path_in_stable_order() {
+	const ROOT: &str = "https://example.com/root";
+	const GRAPH_LEFT: &str = "https://example.com/graph-left";
+	const GRAPH_RIGHT: &str = "https://example.com/graph-right";
+	const GRAPH_SHARED: &str = "https://example.com/graph-shared";
+	const NODE_LEFT: &str = "https://example.com/node-left";
+	const NODE_RIGHT: &str = "https://example.com/node-right";
+	const NODE_SHARED: &str = "https://example.com/node-shared";
+	const LEAF: &str = "https://example.com/leaf";
+	const LEFT_EDGE: &str = "https://example.com/edge-a-left";
+	const RIGHT_EDGE: &str = "https://example.com/edge-b-right";
+
+	let mut dataset = IndexedBTreeDataset::new();
+	dataset.insert(dataset_quad(ROOT, LEFT_EDGE, GRAPH_LEFT, None));
+	dataset.insert(dataset_quad(ROOT, RIGHT_EDGE, GRAPH_RIGHT, None));
+	dataset.insert(dataset_quad(
+		NODE_LEFT,
+		EDGE,
+		GRAPH_SHARED,
+		Some(GRAPH_LEFT),
+	));
+	dataset.insert(dataset_quad(
+		NODE_RIGHT,
+		EDGE,
+		GRAPH_SHARED,
+		Some(GRAPH_RIGHT),
+	));
+	dataset.insert(dataset_quad(NODE_SHARED, EDGE, LEAF, Some(GRAPH_SHARED)));
+
+	let view = DatasetView {
+		dataset: &dataset,
+		graph: None,
+	};
+	let quads = to_lexical_quads(generator::Blank::new(), &DefaultGraph(view))
+		.expect("a shared named graph must be revisited once per acyclic path");
+
+	assert_eq!(
+		quads,
+		vec![
+			lexical_quad(NODE_SHARED, EDGE, LEAF, Some(GRAPH_SHARED)),
+			lexical_quad(NODE_LEFT, EDGE, GRAPH_SHARED, Some(GRAPH_LEFT)),
+			lexical_quad(ROOT, LEFT_EDGE, GRAPH_LEFT, None),
+			lexical_quad(NODE_SHARED, EDGE, LEAF, Some(GRAPH_SHARED)),
+			lexical_quad(NODE_RIGHT, EDGE, GRAPH_SHARED, Some(GRAPH_RIGHT)),
+			lexical_quad(ROOT, RIGHT_EDGE, GRAPH_RIGHT, None),
+		]
+	);
+}
+
+#[test]
+fn dataset_view_terminates_mixed_subject_and_named_graph_cycles() {
+	const ROOT: &str = "https://example.com/root";
+	const GRAPH: &str = "https://example.com/graph";
+	const NODE_A: &str = "https://example.com/node-a";
+	const NODE_B: &str = "https://example.com/node-b";
+	const BACK_EDGE: &str = "https://example.com/edge-b-back";
+	const GRAPH_EDGE: &str = "https://example.com/edge-c-graph";
+
+	let mut dataset = IndexedBTreeDataset::new();
+	dataset.insert(dataset_quad(ROOT, EDGE, GRAPH, None));
+	dataset.insert(dataset_quad(NODE_A, EDGE, NODE_B, Some(GRAPH)));
+	dataset.insert(dataset_quad(NODE_B, BACK_EDGE, NODE_A, Some(GRAPH)));
+	dataset.insert(dataset_quad(NODE_B, GRAPH_EDGE, GRAPH, Some(GRAPH)));
+
+	let view = DatasetView {
+		dataset: &dataset,
+		graph: None,
+	};
+	let quads = to_lexical_quads(generator::Blank::new(), &DefaultGraph(view))
+		.expect("combined subject and named-graph cycles must terminate");
+
+	assert_eq!(
+		quads,
+		vec![
+			lexical_quad(NODE_A, EDGE, NODE_B, Some(GRAPH)),
+			lexical_quad(NODE_B, BACK_EDGE, NODE_A, Some(GRAPH)),
+			lexical_quad(NODE_B, GRAPH_EDGE, GRAPH, Some(GRAPH)),
+			lexical_quad(ROOT, EDGE, GRAPH, None),
 		]
 	);
 }
@@ -210,6 +414,49 @@ fn dataset_graph_view_revisits_shared_subject_per_path_in_stable_order() {
 			lexical_quad(RIGHT, EDGE, SHARED, None),
 			lexical_quad(ROOT, RIGHT_EDGE, RIGHT, None),
 		]
+	);
+}
+
+#[test]
+fn dataset_graph_view_restores_the_path_after_a_visitor_error() {
+	const ROOT: &str = "https://example.com/root";
+	const CHILD: &str = "https://example.com/child";
+	const LEAF: &str = "https://example.com/leaf";
+
+	let mut dataset = IndexedBTreeDataset::new();
+	dataset.insert(dataset_quad(ROOT, EDGE, CHILD, None));
+	dataset.insert(dataset_quad(CHILD, EDGE, LEAF, None));
+
+	let root = resource(ROOT);
+	let subject_view = IdentifiedSubject(
+		&root,
+		DatasetGraphView {
+			dataset: &dataset,
+			graph: None,
+			resource: &root,
+		},
+	);
+	let failures = Rc::new(Cell::new(0));
+	let retried_predicates = Rc::new(Cell::new(0));
+
+	probe_nested_object_cleanup(
+		&subject_view,
+		ProbeNestedObjectCleanup {
+			failures: Rc::clone(&failures),
+			retried_predicates: Rc::clone(&retried_predicates),
+		},
+	)
+	.expect("a handled visitor error must not poison the active traversal path");
+
+	assert_eq!(
+		failures.get(),
+		1,
+		"the injected nested error must propagate"
+	);
+	assert_eq!(
+		retried_predicates.get(),
+		1,
+		"the child predicates must be revisited after path cleanup",
 	);
 }
 
