@@ -331,7 +331,13 @@ where
 	type Subject = RdfId<V>;
 	type Predicate = V::Iri;
 	type Object = Term<RdfId<V>, V::Literal>;
-	type ObjectRef<'a> = Term<&'a RdfId<V>, &'a V::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a RdfId<V>, &'a V::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -502,7 +508,13 @@ where
 	type Subject = I::Resource;
 	type Predicate = I::Resource;
 	type Object = I::Resource;
-	type ObjectRef<'a> = &'a I::Resource where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= &'a I::Resource
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -715,7 +727,13 @@ where
 	type Subject = Id;
 	type Predicate = IriBuf;
 	type Object = Term;
-	type ObjectRef<'a> = Term<&'a Id, &'a rdf_types::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a Id, &'a rdf_types::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
