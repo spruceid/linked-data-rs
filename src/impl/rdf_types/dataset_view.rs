@@ -11,6 +11,8 @@ use rdf_types::{
 	Dataset, Interpretation, Quad, Vocabulary,
 };
 
+use super::ScopedPathEntry;
+
 impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V> for DatasetView<'a, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
@@ -132,7 +134,7 @@ where
 		S: SubjectVisitor<I, V>,
 	{
 		let subject = self.object;
-		let visit_predicates = self.visited_subjects.borrow_mut().insert(subject);
+		let path_entry = ScopedPathEntry::enter(self.visited_subjects, subject);
 
 		let result = Subject::new(
 			self.dataset,
@@ -140,16 +142,11 @@ where
 			subject,
 			self.visited_subjects,
 			self.visited_graphs,
-			visit_predicates,
+			path_entry.was_inserted(),
 		)
 		.visit(&mut visitor);
 
-		// Restore the path before propagating a visitor error.
-		if visit_predicates {
-			let removed = self.visited_subjects.borrow_mut().remove(subject);
-			debug_assert!(removed);
-		}
-
+		drop(path_entry);
 		result?;
 		visitor.end()
 	}
@@ -217,16 +214,14 @@ where
 			}
 
 			if self.dataset.contains_named_graph(self.subject) {
-				let visit_graph = self.visited_graphs.borrow_mut().insert(self.subject);
-				if visit_graph {
+				let path_entry = ScopedPathEntry::enter(self.visited_graphs, self.subject);
+				if path_entry.was_inserted() {
 					let result = visitor.graph(&NamedGraphView {
 						dataset: self.dataset,
 						graph: self.subject,
 						visited_graphs: self.visited_graphs,
 					});
-					// Restore the path before propagating a visitor error.
-					let removed = self.visited_graphs.borrow_mut().remove(self.subject);
-					debug_assert!(removed);
+					drop(path_entry);
 					result?;
 				}
 			}

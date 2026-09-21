@@ -1,8 +1,12 @@
-use std::{cell::Cell, rc::Rc};
+use std::{
+	cell::Cell,
+	panic::{catch_unwind, AssertUnwindSafe},
+	rc::Rc,
+};
 
 use iref::IriBuf;
 use linked_data::{
-	to_lexical_quads, to_lexical_subject_quads, LinkedData, LinkedDataGraph,
+	to_lexical_quads, to_lexical_subject_quads, GraphVisitor, LinkedData, LinkedDataGraph,
 	LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, PredicateObjectsVisitor,
 	RdfQuad, ResourceInterpretation, SubjectVisitor, Visitor,
 };
@@ -209,6 +213,171 @@ where
 	value.visit_subject(visitor)
 }
 
+#[derive(Clone)]
+enum NamedGraphProbe {
+	Fail,
+	Panic,
+	Count(Rc<Cell<usize>>),
+}
+
+impl<I: Interpretation, V: Vocabulary> SubjectVisitor<I, V> for NamedGraphProbe {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn predicate<L, T>(&mut self, _predicate: &L, objects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
+	{
+		objects.visit_objects(NamedGraphObjects {
+			probe: self.clone(),
+		})
+	}
+
+	fn reverse_predicate<L, T>(&mut self, _predicate: &L, _subjects: &T) -> Result<(), Self::Error>
+	where
+		L: ?Sized + LinkedDataResource<I, V>,
+		T: ?Sized + LinkedDataPredicateObjects<I, V>,
+	{
+		Ok(())
+	}
+
+	fn graph<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataGraph<I, V>,
+	{
+		match self {
+			Self::Fail => Err("injected named-graph visitor failure"),
+			Self::Panic => panic!("injected named-graph visitor panic"),
+			Self::Count(count) => {
+				count.set(count.get() + 1);
+				Ok(())
+			}
+		}
+	}
+
+	fn include<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+	{
+		Ok(())
+	}
+
+	fn end(self) -> Result<Self::Ok, Self::Error> {
+		Ok(())
+	}
+}
+
+struct NamedGraphObjects {
+	probe: NamedGraphProbe,
+}
+
+impl<I: Interpretation, V: Vocabulary> PredicateObjectsVisitor<I, V> for NamedGraphObjects {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn object<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+	{
+		value.visit_subject(self.probe.clone())
+	}
+
+	fn end(self) -> Result<Self::Ok, Self::Error> {
+		Ok(())
+	}
+}
+
+#[derive(Clone, Copy)]
+enum ProbeFailure {
+	Error,
+	Panic,
+}
+
+struct ProbeNamedGraphCleanup {
+	failure: ProbeFailure,
+	failures: Rc<Cell<usize>>,
+	retried_graphs: Rc<Cell<usize>>,
+}
+
+impl<I: Interpretation, V: Vocabulary> GraphVisitor<I, V> for ProbeNamedGraphCleanup {
+	type Ok = ();
+	type Error = &'static str;
+
+	fn subject<T>(&mut self, value: &T) -> Result<(), Self::Error>
+	where
+		T: ?Sized + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+	{
+		let failed = match self.failure {
+			ProbeFailure::Error => match value.visit_subject(NamedGraphProbe::Fail) {
+				Err("injected named-graph visitor failure") => true,
+				Err(error) => return Err(error),
+				Ok(()) => false,
+			},
+			ProbeFailure::Panic => catch_unwind(AssertUnwindSafe(|| {
+				value.visit_subject(NamedGraphProbe::Panic)
+			}))
+			.is_err(),
+		};
+
+		if failed {
+			self.failures.set(self.failures.get() + 1);
+			value.visit_subject(NamedGraphProbe::Count(Rc::clone(&self.retried_graphs)))?;
+		}
+
+		Ok(())
+	}
+
+	fn end(self) -> Result<Self::Ok, Self::Error> {
+		Ok(())
+	}
+}
+
+fn probe_named_graph_cleanup<T>(
+	value: &T,
+	visitor: ProbeNamedGraphCleanup,
+) -> Result<(), &'static str>
+where
+	T: LinkedDataGraph<rdf_types::interpretation::WithGenerator<generator::Blank>, ()>,
+{
+	value.visit_graph(visitor)
+}
+
+fn assert_dataset_view_named_graph_cleanup(failure: ProbeFailure) {
+	const ROOT: &str = "https://example.com/root";
+	const GRAPH: &str = "https://example.com/graph";
+	const NODE: &str = "https://example.com/node";
+	const LEAF: &str = "https://example.com/leaf";
+
+	let mut dataset = IndexedBTreeDataset::new();
+	dataset.insert(dataset_quad(ROOT, EDGE, GRAPH, None));
+	dataset.insert(dataset_quad(NODE, EDGE, LEAF, Some(GRAPH)));
+
+	let failures = Rc::new(Cell::new(0));
+	let retried_graphs = Rc::new(Cell::new(0));
+	let view = DatasetView {
+		dataset: &dataset,
+		graph: None,
+	};
+
+	let result = probe_named_graph_cleanup(
+		&view,
+		ProbeNamedGraphCleanup {
+			failure,
+			failures: Rc::clone(&failures),
+			retried_graphs: Rc::clone(&retried_graphs),
+		},
+	);
+	result.expect("a handled visitor failure must not poison the active graph path");
+
+	assert_eq!(failures.get(), 1, "the injected failure must be observed");
+	assert_eq!(
+		retried_graphs.get(),
+		1,
+		"the named graph must be revisited after path cleanup",
+	);
+}
+
 #[test]
 fn dataset_view_terminates_named_graph_cycle_in_stable_order() {
 	const ROOT: &str = "https://example.com/root";
@@ -320,6 +489,16 @@ fn dataset_view_terminates_mixed_subject_and_named_graph_cycles() {
 			lexical_quad(ROOT, EDGE, GRAPH, None),
 		]
 	);
+}
+
+#[test]
+fn dataset_view_restores_named_graph_paths_after_a_visitor_error() {
+	assert_dataset_view_named_graph_cleanup(ProbeFailure::Error);
+}
+
+#[test]
+fn dataset_view_restores_named_graph_paths_after_a_visitor_panic() {
+	assert_dataset_view_named_graph_cleanup(ProbeFailure::Panic);
 }
 
 #[test]

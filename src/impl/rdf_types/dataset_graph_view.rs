@@ -9,6 +9,8 @@ use crate::{
 	ResourceInterpretation, SubjectVisitor,
 };
 
+use super::ScopedPathEntry;
+
 impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for DatasetGraphView<'a, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
@@ -93,23 +95,18 @@ where
 		S: SubjectVisitor<I, V>,
 	{
 		let subject = self.object;
-		let visit_predicates = self.visited.borrow_mut().insert(subject);
+		let path_entry = ScopedPathEntry::enter(self.visited, subject);
 
 		let result = Subject::new(
 			self.dataset,
 			self.graph,
 			subject,
 			self.visited,
-			visit_predicates,
+			path_entry.was_inserted(),
 		)
 		.visit(&mut visitor);
 
-		// Restore the path before propagating a visitor error.
-		if visit_predicates {
-			let removed = self.visited.borrow_mut().remove(subject);
-			debug_assert!(removed);
-		}
-
+		drop(path_entry);
 		result?;
 		visitor.end()
 	}
