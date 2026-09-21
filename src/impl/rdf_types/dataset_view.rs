@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{cell::RefCell, collections::HashSet, hash::Hash};
 
 use crate::{
 	GraphVisitor, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource,
@@ -11,6 +11,8 @@ use rdf_types::{
 	Dataset, Interpretation, Quad, Vocabulary,
 };
 
+use super::ScopedPathEntry;
+
 impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataGraph<I, V> for DatasetView<'a, D>
 where
 	I::Resource: Eq + Hash + LinkedDataResource<I, V>,
@@ -22,8 +24,8 @@ where
 	where
 		S: GraphVisitor<I, V>,
 	{
-		let mut visited_subjects = im::HashSet::new();
-		let mut visited_graphs = im::HashSet::new();
+		let mut visited_subjects = HashSet::new();
+		let mut visited_graphs = HashSet::new();
 		if let Some(g) = self.graph {
 			visited_graphs.insert(g);
 		}
@@ -42,6 +44,8 @@ where
 				graph_subjects.push(subject);
 			}
 		}
+		let visited_subjects = RefCell::new(visited_subjects);
+		let visited_graphs = RefCell::new(visited_graphs);
 
 		for subject in graph_subjects {
 			visitor.subject(&Subject::new(
@@ -63,8 +67,8 @@ struct PredicateObjects<'d, 'v, D: Dataset> {
 	graph: Option<&'d D::Resource>,
 	subject: &'d D::Resource,
 	predicate: &'d D::Resource,
-	visited_subjects: &'v im::HashSet<&'d D::Resource>,
-	visited_graphs: &'v im::HashSet<&'d D::Resource>,
+	visited_subjects: &'v RefCell<HashSet<&'d D::Resource>>,
+	visited_graphs: &'v RefCell<HashSet<&'d D::Resource>>,
 }
 
 impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
@@ -105,7 +109,7 @@ where
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		self.object.interpretation(vocabulary, interpretation)
 	}
 }
@@ -114,8 +118,8 @@ struct Object<'a, 'v, D: Dataset> {
 	dataset: &'a D,
 	graph: Option<&'a D::Resource>,
 	object: &'a D::Resource,
-	visited_subjects: &'v im::HashSet<&'a D::Resource>,
-	visited_graphs: &'v im::HashSet<&'a D::Resource>,
+	visited_subjects: &'v RefCell<HashSet<&'a D::Resource>>,
+	visited_graphs: &'v RefCell<HashSet<&'a D::Resource>>,
 }
 
 impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'a, 'v, D>
@@ -130,20 +134,20 @@ where
 		S: SubjectVisitor<I, V>,
 	{
 		let subject = self.object;
+		let path_entry = ScopedPathEntry::enter(self.visited_subjects, subject);
 
-		let mut visited_subjects = self.visited_subjects.clone();
-		let visit_predicates = visited_subjects.insert(subject).is_none();
-
-		Subject::new(
+		let result = Subject::new(
 			self.dataset,
 			self.graph,
 			subject,
-			&visited_subjects,
+			self.visited_subjects,
 			self.visited_graphs,
-			visit_predicates,
+			path_entry.was_inserted(),
 		)
-		.visit(&mut visitor)?;
+		.visit(&mut visitor);
 
+		drop(path_entry);
+		result?;
 		visitor.end()
 	}
 }
@@ -152,8 +156,8 @@ struct Subject<'a, 'v, D: Dataset> {
 	dataset: &'a D,
 	graph: Option<&'a D::Resource>,
 	subject: &'a D::Resource,
-	visited_subjects: &'v im::HashSet<&'a D::Resource>,
-	visited_graphs: &'v im::HashSet<&'a D::Resource>,
+	visited_subjects: &'v RefCell<HashSet<&'a D::Resource>>,
+	visited_graphs: &'v RefCell<HashSet<&'a D::Resource>>,
 	visit_predicates: bool,
 }
 
@@ -169,8 +173,8 @@ where
 		dataset: &'a D,
 		graph: Option<&'a D::Resource>,
 		subject: &'a D::Resource,
-		visited_subjects: &'v im::HashSet<&'a D::Resource>,
-		visited_graphs: &'v im::HashSet<&'a D::Resource>,
+		visited_subjects: &'v RefCell<HashSet<&'a D::Resource>>,
+		visited_graphs: &'v RefCell<HashSet<&'a D::Resource>>,
 		visit_predicates: bool,
 	) -> Self {
 		Self {
@@ -210,13 +214,15 @@ where
 			}
 
 			if self.dataset.contains_named_graph(self.subject) {
-				let mut visited_graphs = self.visited_graphs.clone();
-				if visited_graphs.insert(self.subject).is_none() {
-					visitor.graph(&NamedGraphView {
+				let path_entry = ScopedPathEntry::enter(self.visited_graphs, self.subject);
+				if path_entry.was_inserted() {
+					let result = visitor.graph(&NamedGraphView {
 						dataset: self.dataset,
 						graph: self.subject,
-						visited_graphs: &visited_graphs,
-					})?;
+						visited_graphs: self.visited_graphs,
+					});
+					drop(path_entry);
+					result?;
 				}
 			}
 		}
@@ -234,7 +240,7 @@ where
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		self.subject.interpretation(vocabulary, interpretation)
 	}
 }
@@ -274,7 +280,7 @@ where
 struct NamedGraphView<'a, 'v, D: Dataset> {
 	dataset: &'a D,
 	graph: &'a D::Resource,
-	visited_graphs: &'v im::HashSet<&'a D::Resource>,
+	visited_graphs: &'v RefCell<HashSet<&'a D::Resource>>,
 }
 
 impl<'a, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataResource<I, V>
@@ -287,7 +293,7 @@ where
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		self.graph.interpretation(vocabulary, interpretation)
 	}
 }
@@ -304,7 +310,7 @@ where
 	where
 		S: GraphVisitor<I, V>,
 	{
-		let mut visited_subjects = im::HashSet::new();
+		let mut visited_subjects = HashSet::new();
 		let mut graph_subjects = Vec::new();
 
 		for subject in self.dataset.subjects() {
@@ -320,6 +326,7 @@ where
 				graph_subjects.push(subject);
 			}
 		}
+		let visited_subjects = RefCell::new(visited_subjects);
 
 		for subject in graph_subjects {
 			visitor.subject(&Subject::new(

@@ -111,7 +111,7 @@ impl<'a, V: Vocabulary> CowRdfTerm<'a, V> {
 		}
 	}
 
-	pub fn as_term_ref(&self) -> RdfTermRef<V> {
+	pub fn as_term_ref(&self) -> RdfTermRef<'_, V> {
 		match self {
 			Self::Borrowed(t) => *t,
 			Self::Owned(t) => match t {
@@ -150,7 +150,7 @@ pub trait AsRdfLiteral<V: IriVocabulary + LiteralVocabulary> {
 		&'a self,
 		vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V>;
+	) -> CowRdfLiteral<'a, V>;
 }
 
 impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for str {
@@ -158,7 +158,7 @@ impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for str {
 		&'a self,
 		_vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V> {
+	) -> CowRdfLiteral<'a, V> {
 		CowRdfLiteral::Borrowed(RdfLiteralRef::Any(self, ty))
 	}
 }
@@ -168,7 +168,7 @@ impl<V: IriVocabulary + LiteralVocabulary> AsRdfLiteral<V> for String {
 		&'a self,
 		vocabulary: &V,
 		ty: LiteralTypeRef<'a, V::Iri>,
-	) -> CowRdfLiteral<V> {
+	) -> CowRdfLiteral<'a, V> {
 		self.as_str().as_rdf_literal(vocabulary, ty)
 	}
 }
@@ -206,7 +206,7 @@ impl<V: IriVocabulary> RdfLiteral<V> {
 		}
 	}
 
-	pub fn as_literal_ref(&self) -> RdfLiteralRef<V> {
+	pub fn as_literal_ref(&self) -> RdfLiteralRef<'_, V> {
 		match self {
 			Self::Any(value, ty) => RdfLiteralRef::Any(value, ty.as_ref()),
 			Self::Xsd(value) => RdfLiteralRef::Xsd(value.as_ref()),
@@ -305,7 +305,7 @@ impl<'a, V: IriVocabulary> CowRdfLiteral<'a, V> {
 		}
 	}
 
-	pub fn as_literal_ref(&self) -> RdfLiteralRef<V> {
+	pub fn as_literal_ref(&self) -> RdfLiteralRef<'_, V> {
 		match self {
 			Self::Borrowed(l) => *l,
 			Self::Owned(l) => l.as_literal_ref(),

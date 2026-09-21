@@ -263,7 +263,7 @@ enum VariantShape<'a> {
 	Unit,
 }
 
-fn variant_shape(fields: &syn::Fields) -> VariantShape {
+fn variant_shape(fields: &syn::Fields) -> VariantShape<'_> {
 	match fields {
 		syn::Fields::Named(_) => VariantShape::Compound,
 		syn::Fields::Unnamed(unnamed_fields) => {

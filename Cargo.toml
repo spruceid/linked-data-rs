@@ -28,17 +28,37 @@ xsd-types = "0.9.2"
 static-iref = "3.0"
 json-syntax = { version = "0.12.2", features = ["canonicalize"] }
 educe = "0.4.22"
-im = "15.1.0"
+# Keep rdf-types' educe 0.5 chain compatible with the workspace MSRV.
+enum-ordinalize = "=4.3.0"
+enum-ordinalize-derive = "=4.3.0"
+# Keep ciborium's open half range below its Rust 1.81 releases.
+half = "=2.2.1"
+# Avoid edition-2024 hashbrown releases pulled by rdf-types' open indexmap range.
+indexmap = "=2.2.5"
 iref.workspace = true
 thiserror.workspace = true
 linked-data-derive = { workspace = true, optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
+# smallstr 0.3.1 uses integer APIs stabilized after Rust 1.71.
+smallstr = "=0.3.0"
 
 [dev-dependencies]
 json-syntax = { version = "0.12.2", features = ["serde"] }
 
 [[example]]
 name = "derive"
+required-features = ["derive"]
+
+[[example]]
+name = "derive_enum"
+required-features = ["derive"]
+
+[[example]]
+name = "generics"
+required-features = ["derive"]
+
+[[example]]
+name = "graph"
 required-features = ["derive"]
 
 [workspace]

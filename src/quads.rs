@@ -18,15 +18,17 @@ use crate::{
 	SubjectVisitor, Visitor,
 };
 
-pub fn to_interpreted_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<InterpretedQuad<I>>, IntoQuadsError>
 where
-	I: InterpretationMut<V> + TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
+	I: Interpretation
+		+ InterpretationMut<V>
+		+ TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
 	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
 {
@@ -38,19 +40,20 @@ where
 	})
 }
 
-pub fn to_interpreted_subject_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_subject_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&I::Resource>,
 	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
 	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
 {
@@ -73,18 +76,19 @@ where
 	Ok((subject, result))
 }
 
-pub fn to_interpreted_graph_quads<I: Interpretation, V: Vocabulary>(
+pub fn to_interpreted_graph_quads<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &(impl LinkedDataGraph<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(I::Resource, Vec<InterpretedQuad<I>>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ IriInterpretationMut<V::Iri>
 		+ BlankIdInterpretationMut<V::BlankId>
 		+ LiteralInterpretationMut<V::Literal>,
 	I::Resource: Clone,
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::Iri: Clone,
 	V::BlankId: Clone,
 {
@@ -106,13 +110,14 @@ where
 	Ok((graph, result))
 }
 
-pub fn to_lexical_quads_with<I: Interpretation, V: Vocabulary>(
+pub fn to_lexical_quads_with<I, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<RdfQuad>, IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	let mut domain = LexicalDomain;
@@ -125,14 +130,15 @@ where
 	})
 }
 
-pub fn to_lexical_subject_quads_with<I: Interpretation, V: Vocabulary>(
+pub fn to_lexical_subject_quads_with<I, V: Vocabulary>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	graph: Option<&Id>,
 	value: &(impl LinkedDataSubject<I, V> + LinkedDataResource<I, V>),
 ) -> Result<(Id, Vec<RdfQuad>), IntoQuadsError>
 where
-	I: InterpretationMut<V>
+	I: Interpretation
+		+ InterpretationMut<V>
 		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 	I::Resource: Clone,
 {
@@ -171,17 +177,18 @@ pub fn to_lexical_subject_quads<G: Generator>(
 	to_lexical_subject_quads_with(&mut (), &mut interpretation, graph, value)
 }
 
-pub fn to_quads_with<I: InterpretationMut<V>, V: Vocabulary>(
+pub fn to_quads_with<I, V>(
 	vocabulary: &mut V,
 	interpretation: &mut I,
 	value: &impl LinkedData<I, V>,
 ) -> Result<Vec<RdfQuad<V>>, IntoQuadsError>
 where
-	V: IriVocabularyMut + LiteralVocabularyMut,
+	I: InterpretationMut<V>
+		+ ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+	V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut,
 	V::BlankId: Clone,
 	V::Iri: Clone,
 	V::Literal: Clone,
-	I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
 {
 	let mut domain = VocabularyDomain;
 
@@ -331,7 +338,13 @@ where
 	type Subject = RdfId<V>;
 	type Predicate = V::Iri;
 	type Object = Term<RdfId<V>, V::Literal>;
-	type ObjectRef<'a> = Term<&'a RdfId<V>, &'a V::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a RdfId<V>, &'a V::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -502,7 +515,13 @@ where
 	type Subject = I::Resource;
 	type Predicate = I::Resource;
 	type Object = I::Resource;
-	type ObjectRef<'a> = &'a I::Resource where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= &'a I::Resource
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,
@@ -715,7 +734,13 @@ where
 	type Subject = Id;
 	type Predicate = IriBuf;
 	type Object = Term;
-	type ObjectRef<'a> = Term<&'a Id, &'a rdf_types::Literal> where V::Iri: 'a, V::BlankId: 'a, V::Literal: 'a, I::Resource: 'a;
+	type ObjectRef<'a>
+		= Term<&'a Id, &'a rdf_types::Literal>
+	where
+		V::Iri: 'a,
+		V::BlankId: 'a,
+		V::Literal: 'a,
+		I::Resource: 'a;
 
 	fn subject(
 		&mut self,

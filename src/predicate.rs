@@ -29,8 +29,8 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataPredicateObjects<I, V> for () {
 	}
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataPredicateObjects<I, V>>
-	LinkedDataPredicateObjects<I, V> for &'a T
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataPredicateObjects<I, V>>
+	LinkedDataPredicateObjects<I, V> for &T
 {
 	fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where

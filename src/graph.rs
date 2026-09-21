@@ -21,8 +21,8 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataGraph<I, V> for () {
 	}
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataGraph<I, V>> LinkedDataGraph<I, V>
-	for &'a T
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataGraph<I, V>> LinkedDataGraph<I, V>
+	for &T
 {
 	fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 	where
@@ -100,7 +100,7 @@ pub trait GraphVisitor<I: Interpretation, V: Vocabulary> {
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, S: GraphVisitor<I, V>> GraphVisitor<I, V> for &'a mut S {
+impl<I: Interpretation, V: Vocabulary, S: GraphVisitor<I, V>> GraphVisitor<I, V> for &mut S {
 	type Ok = ();
 	type Error = S::Error;
 
@@ -123,7 +123,7 @@ impl<I: Interpretation, V: Vocabulary, T> LinkedDataResource<I, V> for Anonymous
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> crate::ResourceInterpretation<I, V> {
+	) -> crate::ResourceInterpretation<'_, I, V> {
 		crate::ResourceInterpretation::Uninterpreted(None)
 	}
 }

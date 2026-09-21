@@ -6,7 +6,7 @@ macro_rules! json_literal {
 				&self,
 				_vocabulary: &mut V,
 				_interpretation: &mut I,
-			) -> $crate::ResourceInterpretation<I, V> {
+			) -> $crate::ResourceInterpretation<'_, I, V> {
 				use $crate::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
 
 				let mut value = $crate::json_syntax::to_value(self).unwrap();
@@ -137,9 +137,10 @@ macro_rules! json_literal {
 	};
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod test {
 	#[derive(Debug, serde::Serialize, serde::Deserialize)]
+	#[allow(dead_code)] // Compile-only coverage for the generated implementations.
 	struct Test {
 		field: String,
 	}

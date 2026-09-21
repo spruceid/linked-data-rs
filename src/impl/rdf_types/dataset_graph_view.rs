@@ -2,12 +2,14 @@ use rdf_types::{
 	dataset::{DatasetGraphView, PatternMatchingDataset, PredicateTraversableDataset},
 	Dataset, Interpretation, Vocabulary,
 };
-use std::hash::Hash;
+use std::{cell::RefCell, collections::HashSet, hash::Hash};
 
 use crate::{
 	LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, PredicateObjectsVisitor,
 	ResourceInterpretation, SubjectVisitor,
 };
+
+use super::ScopedPathEntry;
 
 impl<'a, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for DatasetGraphView<'a, D>
 where
@@ -18,8 +20,9 @@ where
 	where
 		S: SubjectVisitor<I, V>,
 	{
-		let mut visited = im::HashSet::new();
+		let mut visited = HashSet::new();
 		visited.insert(self.resource);
+		let visited = RefCell::new(visited);
 
 		Subject::new(self.dataset, self.graph, self.resource, &visited, true)
 			.visit(&mut serializer)?;
@@ -32,7 +35,7 @@ struct PredicateObjects<'d, 'v, D: Dataset> {
 	graph: Option<&'d D::Resource>,
 	subject: &'d D::Resource,
 	predicate: &'d D::Resource,
-	visited: &'v im::HashSet<&'d D::Resource>,
+	visited: &'v RefCell<HashSet<&'d D::Resource>>,
 }
 
 impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataPredicateObjects<I, V>
@@ -70,7 +73,7 @@ where
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		self.object.interpretation(vocabulary, interpretation)
 	}
 }
@@ -79,7 +82,7 @@ struct Object<'d, 'v, D: Dataset> {
 	dataset: &'d D,
 	graph: Option<&'d D::Resource>,
 	object: &'d D::Resource,
-	visited: &'v im::HashSet<&'d D::Resource>,
+	visited: &'v RefCell<HashSet<&'d D::Resource>>,
 }
 
 impl<'d, 'v, I: Interpretation, V: Vocabulary, D> LinkedDataSubject<I, V> for Object<'d, 'v, D>
@@ -92,18 +95,19 @@ where
 		S: SubjectVisitor<I, V>,
 	{
 		let subject = self.object;
-		let mut visited = self.visited.clone();
-		let visit_predicates = visited.insert(subject).is_none();
+		let path_entry = ScopedPathEntry::enter(self.visited, subject);
 
-		Subject::new(
+		let result = Subject::new(
 			self.dataset,
 			self.graph,
 			subject,
-			&visited,
-			visit_predicates,
+			self.visited,
+			path_entry.was_inserted(),
 		)
-		.visit(&mut visitor)?;
+		.visit(&mut visitor);
 
+		drop(path_entry);
+		result?;
 		visitor.end()
 	}
 }
@@ -112,7 +116,7 @@ struct Subject<'d, 'v, D: Dataset> {
 	dataset: &'d D,
 	graph: Option<&'d D::Resource>,
 	subject: &'d D::Resource,
-	visited: &'v im::HashSet<&'d D::Resource>,
+	visited: &'v RefCell<HashSet<&'d D::Resource>>,
 	visit_predicates: bool,
 }
 
@@ -121,7 +125,7 @@ impl<'d, 'v, D: PredicateTraversableDataset + PatternMatchingDataset> Subject<'d
 		dataset: &'d D,
 		graph: Option<&'d D::Resource>,
 		subject: &'d D::Resource,
-		visited: &'v im::HashSet<&'d D::Resource>,
+		visited: &'v RefCell<HashSet<&'d D::Resource>>,
 		visit_predicates: bool,
 	) -> Self {
 		Self {
@@ -141,20 +145,22 @@ impl<'d, 'v, D: PredicateTraversableDataset + PatternMatchingDataset> Subject<'d
 		S: SubjectVisitor<I, V>,
 		I::Resource: Eq + Hash + LinkedDataResource<I, V>,
 	{
-		for (predicate, _) in self
-			.dataset
-			.quad_predicates_objects(self.graph, self.subject)
-		{
-			visitor.predicate(
-				predicate,
-				&PredicateObjects {
-					dataset: self.dataset,
-					graph: self.graph,
-					subject: self.subject,
+		if self.visit_predicates {
+			for (predicate, _) in self
+				.dataset
+				.quad_predicates_objects(self.graph, self.subject)
+			{
+				visitor.predicate(
 					predicate,
-					visited: self.visited,
-				},
-			)?;
+					&PredicateObjects {
+						dataset: self.dataset,
+						graph: self.graph,
+						subject: self.subject,
+						predicate,
+						visited: self.visited,
+					},
+				)?;
+			}
 		}
 
 		Ok(())
