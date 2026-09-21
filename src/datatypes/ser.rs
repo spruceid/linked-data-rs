@@ -16,7 +16,7 @@ macro_rules! datatype {
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
-				) -> ResourceInterpretation<I, V> {
+				) -> ResourceInterpretation<'_, I, V> {
 					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(RdfLiteral::Xsd(
 						xsd_types::Value::$variant(self.clone())
 					)))))
@@ -53,7 +53,7 @@ macro_rules! unsized_datatype {
 					&self,
 					_vocabulary: &mut V,
 					_interpretation: &mut I,
-				) -> ResourceInterpretation<I, V> {
+				) -> ResourceInterpretation<'_, I, V> {
 					ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(RdfLiteralRef::Xsd(
 						xsd_types::ValueRef::$variant(self)
 					)))))
@@ -106,7 +106,7 @@ impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 		&self,
 		_vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
 			RdfLiteral::Xsd(xsd_types::Value::AnyUri(self.clone())),
 		))))
@@ -116,7 +116,7 @@ impl<V: Vocabulary + IriVocabularyMut + LiteralVocabularyMut, I: Interpretation>
 		&self,
 		vocabulary: &mut V,
 		_interpretation: &mut I,
-	) -> ResourceInterpretation<I, V> {
+	) -> ResourceInterpretation<'_, I, V> {
 		ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Id(Id::Iri(
 			vocabulary.insert(self.as_iri()),
 		)))))

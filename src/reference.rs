@@ -22,7 +22,7 @@ impl<I: Interpretation, V: Vocabulary, T: LinkedDataResource<I, V>> LinkedDataRe
 		&self,
 		vocabulary: &mut V,
 		interpretation: &mut I,
-	) -> crate::ResourceInterpretation<I, V> {
+	) -> crate::ResourceInterpretation<'_, I, V> {
 		T::reference_interpretation(&self.0, vocabulary, interpretation)
 	}
 }

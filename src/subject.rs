@@ -27,8 +27,8 @@ impl<I: Interpretation, V: Vocabulary> LinkedDataSubject<I, V> for () {
 	}
 }
 
-impl<'a, I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataSubject<I, V>>
-	LinkedDataSubject<I, V> for &'a T
+impl<I: Interpretation, V: Vocabulary, T: ?Sized + LinkedDataSubject<I, V>> LinkedDataSubject<I, V>
+	for &T
 {
 	fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
@@ -128,9 +128,7 @@ pub trait SubjectVisitor<I: Interpretation, V: Vocabulary> {
 	fn end(self) -> Result<Self::Ok, Self::Error>;
 }
 
-impl<'s, I: Interpretation, V: Vocabulary, S: SubjectVisitor<I, V>> SubjectVisitor<I, V>
-	for &'s mut S
-{
+impl<I: Interpretation, V: Vocabulary, S: SubjectVisitor<I, V>> SubjectVisitor<I, V> for &mut S {
 	type Ok = ();
 	type Error = S::Error;
 
