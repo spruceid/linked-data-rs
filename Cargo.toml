@@ -1,3 +1,18 @@
+[workspace.package]
+authors = ["Spruce Systems, Inc."]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/spruceid/linked-data-rs"
+edition = "2024"
+rust-version = "1.87.0"
+version = "0.1.2"
+
+[workspace]
+members = ["derive"]
+
+[workspace.dependencies]
+linked-data-derive = { version = "0.1.0", path = "derive" } # Keep the version in sync
+rdf-syntax = "2.0"
+
 [package]
 name = "linked-data"
 description = "Linked-Data dateset serialization/deserialization traits"
@@ -10,21 +25,16 @@ edition.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[workspace.package]
-authors = ["Spruce Systems, Inc."]
-license = "MIT/Apache-2.0"
-repository = "https://github.com/spruceid/linked-data-rs"
-edition = "2021"
-rust-version = "1.71.1"
-version = "0.1.2"
-
 [features]
-default = ["indexmap"]
+default = []
 derive = ["linked-data-derive"]
 indexmap = ["dep:indexmap"]
+btree-indexmap = ["dep:btree-indexmap"]
 
 [dependencies]
-rdf-types.workspace = true
+rdf-syntax.workspace = true
+thiserror = "2.0.17"
+xsd-types = "0.10.0"
 
 # Derive macro.
 linked-data-derive = { workspace = true, optional = true }
@@ -32,15 +42,9 @@ linked-data-derive = { workspace = true, optional = true }
 # Support for `indexmap`.
 indexmap = { version = "2.10.0", optional = true }
 
-[[example]]
-name = "derive"
-required-features = ["derive"]
+# Support for `btree-indexmap`.
+btree-indexmap = { version = "1.4", optional = true }
 
-[workspace]
-members = ["derive"]
-
-resolver = "2"
-
-[workspace.dependencies]
-linked-data-derive = { version = "0.1.0", path = "derive" }
-rdf-types.path = "/home/timothee/Projets/rdf/rdf-types/"
+[dev-dependencies]
+nquads-syntax = "0.21"
+linked-data = { path = ".", features = ["derive"] }

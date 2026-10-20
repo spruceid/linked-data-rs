@@ -17,4 +17,4 @@ proc-macro2 = "1.0.66"
 quote = "1.0.33"
 proc-macro-error = "1.0.4"
 thiserror = "1.0.47"
-rdf-types.workspace = true
+rdf-syntax.workspace = true
