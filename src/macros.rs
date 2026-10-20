@@ -1,13 +1,13 @@
 #[macro_export]
 macro_rules! json_literal {
 	($ty:ty) => {
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataResource<I, V> for $ty {
+		impl<V: $crate::rdf_syntax::Vocabulary, I: $crate::rdf_syntax::Interpretation> $crate::LinkedDataResource<I, V> for $ty {
 			fn interpretation(
 				&self,
 				_vocabulary: &mut V,
 				_interpretation: &mut I,
 			) -> $crate::ResourceInterpretation<I, V> {
-				use $crate::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
+				use $crate::{rdf_syntax::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
 
 				let mut value = $crate::json_syntax::to_value(self).unwrap();
 				value.canonicalize();
@@ -18,7 +18,7 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataPredicateObjects<I, V> for $ty {
+		impl<V: $crate::rdf_syntax::Vocabulary, I: $crate::rdf_syntax::Interpretation> $crate::LinkedDataPredicateObjects<I, V> for $ty {
 			fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: $crate::PredicateObjectsVisitor<I, V>,
@@ -28,10 +28,10 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializePredicateObjects<I, V> for $ty
+		impl<V: $crate::rdf_syntax::Vocabulary, I: $crate::rdf_syntax::Interpretation> $crate::LinkedDataDeserializePredicateObjects<I, V> for $ty
 		where
-			V: $crate::rdf_types::Vocabulary,
-			I: $crate::rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
+			V: $crate::rdf_syntax::Vocabulary,
+			I: $crate::rdf_syntax::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_syntax::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
 			fn deserialize_objects_in<'a, D>(
 				vocabulary: &V,
@@ -43,7 +43,7 @@ macro_rules! json_literal {
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
 				I::Resource: 'a,
-				D: $crate::rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
+				D: $crate::rdf_syntax::dataset::PatternMatchingDataset<Resource = I::Resource>
 			{
 				let mut objects = objects.into_iter();
 				match objects.next() {
@@ -65,7 +65,7 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataSubject<I, V> for $ty {
+		impl<V: $crate::rdf_syntax::Vocabulary, I: $crate::rdf_syntax::Interpretation> $crate::LinkedDataSubject<I, V> for $ty {
 			fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
 			where
 				S: $crate::SubjectVisitor<I, V>,
@@ -74,10 +74,10 @@ macro_rules! json_literal {
 			}
 		}
 
-		impl<V: $crate::rdf_types::Vocabulary, I: $crate::rdf_types::Interpretation> $crate::LinkedDataDeserializeSubject<I, V> for $ty
+		impl<V: $crate::rdf_syntax::Vocabulary, I: $crate::rdf_syntax::Interpretation> $crate::LinkedDataDeserializeSubject<I, V> for $ty
 		where
-			V: $crate::rdf_types::Vocabulary,
-			I: $crate::rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
+			V: $crate::rdf_syntax::Vocabulary,
+			I: $crate::rdf_syntax::interpretation::ReverseIriInterpretation<Iri = V::Iri> + $crate::rdf_syntax::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>
 		{
 			fn deserialize_subject_in<D>(
 				vocabulary: &V,
@@ -88,9 +88,9 @@ macro_rules! json_literal {
 				context: $crate::Context<I>
 			) -> Result<Self, $crate::FromLinkedDataError>
 			where
-				D: $crate::rdf_types::dataset::PatternMatchingDataset<Resource = I::Resource>
+				D: $crate::rdf_syntax::dataset::PatternMatchingDataset<Resource = I::Resource>
 			{
-				use $crate::rdf_types::LiteralTypeRef;
+				use $crate::rdf_syntax::LiteralTypeRef;
 
 				let mut literal_ty = None;
 				for l in interpretation.literals_of(resource) {
@@ -98,9 +98,9 @@ macro_rules! json_literal {
 					match literal.type_ {
 						LiteralTypeRef::Any(ty) => {
 							let ty_iri = vocabulary.iri(ty).unwrap();
-							if ty_iri == $crate::rdf_types::RDF_JSON {
-								use $crate::json_syntax::Parse;
-								let (json, _) = $crate::json_syntax::Value::parse_str(literal.value)
+							if ty_iri == $crate::rdf_syntax::RDF_JSON {
+								use $crate::json_syntax::JsonParse;
+								let (json, _) = $crate::JsonValue::parse_str(literal.value)
 									.map_err(|_| $crate::FromLinkedDataError::InvalidLiteral(
 										context.into_iris(vocabulary, interpretation)
 									))?;
@@ -113,7 +113,7 @@ macro_rules! json_literal {
 							}
 						}
 						LiteralTypeRef::LangString(_) => {
-							literal_ty = Some($crate::rdf_types::RDF_LANG_STRING)
+							literal_ty = Some($crate::rdf_syntax::RDF_LANG_STRING)
 						}
 					}
 				}
@@ -122,7 +122,7 @@ macro_rules! json_literal {
 					Some(ty) => {
 						Err($crate::FromLinkedDataError::LiteralTypeMismatch {
 							context: context.into_iris(vocabulary, interpretation),
-							expected: Some($crate::rdf_types::RDF_JSON.to_owned()),
+							expected: Some($crate::rdf_syntax::RDF_JSON.to_owned()),
 							found: ty.to_owned()
 						})
 					}

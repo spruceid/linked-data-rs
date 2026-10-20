@@ -37,11 +37,11 @@ let value = Foo {
   email: "john.smith@example.org".to_owned()
 };
 
-let quads = linked_data::to_quads(rdf_types::generator::Blank::new(), &value)
+let quads = linked_data::to_quads(rdf_syntax::generator::Blank::new(), &value)
   .expect("RDF serialization failed");
 
 for quad in quads {
-  use rdf_types::RdfDisplay;
+  use rdf_syntax::RdfDisplay;
   println!("{} .", quad.rdf_display())
 }
 ```

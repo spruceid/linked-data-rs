@@ -88,17 +88,13 @@ impl<R: Clone + Ord, D: LinkedDataDeserializer<R>> LinkedDataDeserializer<R>
 
 	fn deserialize_quad<'p>(
 		&mut self,
-		pattern: impl Into<rdf_syntax::pattern::CanonicalQuadPattern<&'p R>>,
+		pattern: impl Into<rdf_syntax::pattern::LinearQuadPattern<&'p R>>,
 	) -> Result<Option<rdf_syntax::Quad<R>>, Self::Error>
 	where
 		R: 'p,
 	{
 		let pattern = pattern.into();
-		let quad = match self
-			.pending_quads
-			.extract_pattern_matching(pattern.clone())
-			.next()
-		{
+		let quad = match self.pending_quads.extract_pattern_matching(pattern).next() {
 			Some(quad) => Some(quad),
 			None => self.inner.deserialize_quad(pattern)?,
 		};
@@ -112,7 +108,7 @@ impl<R: Clone + Ord, D: LinkedDataDeserializer<R>> LinkedDataDeserializer<R>
 
 	fn peek_quads<'p>(
 		&'p self,
-		pattern: impl Into<rdf_syntax::pattern::CanonicalQuadPattern<&'p R>>,
+		pattern: impl Into<rdf_syntax::pattern::LinearQuadPattern<&'p R>>,
 	) -> Result<impl Iterator<Item = Result<Quad<&'p R>, Self::Error>>, Self::Error>
 	where
 		R: 'p,
@@ -120,7 +116,7 @@ impl<R: Clone + Ord, D: LinkedDataDeserializer<R>> LinkedDataDeserializer<R>
 		let pattern = pattern.into();
 		Ok(self
 			.pending_quads
-			.pattern_matching(pattern.clone())
+			.pattern_matching(pattern)
 			.map(Ok)
 			.chain(self.inner.peek_quads(pattern)?))
 	}

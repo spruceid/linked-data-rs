@@ -1,6 +1,6 @@
 use rdf_syntax::{
 	CowTerm, PatternMatchingDatasetMut, Quad, TryInterpretationMut, TryReverseInterpretation,
-	pattern::CanonicalQuadPattern,
+	pattern::LinearQuadPattern,
 };
 
 use crate::LinkedDataDeserializer;
@@ -65,7 +65,7 @@ where
 
 	fn peek_quads<'p>(
 		&'p self,
-		pattern: impl Into<CanonicalQuadPattern<&'p I::Resource>>,
+		pattern: impl Into<LinearQuadPattern<&'p I::Resource>>,
 	) -> Result<impl Iterator<Item = Result<Quad<&'p I::Resource>, Self::Error>>, Self::Error>
 	where
 		I::Resource: 'p,
@@ -75,7 +75,7 @@ where
 
 	fn deserialize_quad<'p>(
 		&mut self,
-		pattern: impl Into<CanonicalQuadPattern<&'p I::Resource>>,
+		pattern: impl Into<LinearQuadPattern<&'p I::Resource>>,
 	) -> Result<Option<Quad<I::Resource>>, Self::Error>
 	where
 		I::Resource: 'p,

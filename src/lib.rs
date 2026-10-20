@@ -4,11 +4,11 @@
 //!
 //! # Example
 //!
-//! ```
-//! use iref::IriBuf;
-//! use static_iref::iri;
+//! ```ignore
+//! use rdf_syntax::{IriBuf, iri};
+//! use linked_data::{SerializeLinkedData, DeserializeLinkedData};
 //!
-//! #[derive(linked_data::Serialize, linked_data::Deserialize)]
+//! #[derive(SerializeLinkedData, DeserializeLinkedData)]
 //! #[ld(prefix("ex" = "http://example.org/"))]
 //! struct Foo {
 //!   #[ld(id)]
@@ -27,12 +27,11 @@
 //!   email: "john.smith@example.org".to_owned()
 //! };
 //!
-//! let quads = linked_data::to_quads(rdf_types::generator::Blank::new(), &value)
+//! let quads = linked_data::ser::to_rdf_quads(&value)
 //!   .expect("RDF serialization failed");
 //!
 //! for quad in quads {
-//!   use rdf_types::RdfDisplay;
-//!   println!("{} .", quad.rdf_display())
+//!   println!("{quad} .")
 //! }
 //! ```
 //!
@@ -42,7 +41,10 @@
 //! <http://example.org/JohnSmith> <http://example.org/email> "john.smith@example.org" .
 //! ```
 #[doc(hidden)]
-pub use rdf_types;
+pub use rdf_syntax;
+
+#[cfg(feature = "derive")]
+pub use linked_data_derive::{DeserializeLinkedData, SerializeLinkedData};
 
 pub mod de;
 mod r#impl;
@@ -50,3 +52,6 @@ pub mod ser;
 
 pub use de::{DeserializeLinkedData, LinkedDataDeserializer};
 pub use ser::{LinkedDataSerializer, SerializeLinkedData};
+
+/// Utility wrapper to turn lists into unordered collections.
+pub struct RdfUnordered<T>(pub T);

@@ -1,0 +1,16 @@
+_:0 <http://example.org/flattened> "flattened" .
+_:0 <http://example.org/prop1> "John Smith" .
+_:0 <http://example.org/prop2> <http://example.org/id> .
+_:0 <http://example.org/prop3> _:1 .
+_:1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://example.org/A> .
+_:1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:2 .
+_:2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> "B" .
+_:2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:3 .
+_:3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://example.org/C> .
+_:3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:4 .
+_:4 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> "123"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+_:4 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://example.org/C> <http://example.org/c> "C" .
+<http://example.org/id> <http://example.org/value> "1"^^<http://www.w3.org/2001/XMLSchema#unsignedInt> .
+<http://example.org/id> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Bar> .
+"123"^^<http://www.w3.org/2001/XMLSchema#decimal> <http://example.org/d> "123"^^<http://www.w3.org/2001/XMLSchema#int> .

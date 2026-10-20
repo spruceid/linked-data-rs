@@ -1,3 +1,7 @@
 #[cfg(feature = "indexmap")]
 mod indexmap;
-// mod rdf_types;
+
+#[cfg(feature = "btree-indexmap")]
+mod btree_indexmap;
+
+mod xsd;
