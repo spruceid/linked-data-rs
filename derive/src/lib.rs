@@ -5,16 +5,23 @@ use proc_macro::TokenStream;
 use proc_macro_error::{abort, proc_macro_error};
 use syn::DeriveInput;
 
-mod generate;
-pub(crate) mod utils;
+mod attributes;
+mod compact_iri;
+mod de;
+mod error;
+mod ser;
+mod variant;
 
-#[proc_macro_derive(Serialize, attributes(ld))]
+// mod generate;
+// pub(crate) mod utils;
+
+#[proc_macro_derive(SerializeLinkedData, attributes(ld))]
 #[proc_macro_error]
 pub fn derive_serialize(item: TokenStream) -> TokenStream {
 	let input = syn::parse_macro_input!(item as DeriveInput);
 	let mut output = proc_macro2::TokenStream::new();
 
-	match generate::ser::subject(input) {
+	match ser::derive(input) {
 		Ok(tokens) => output.extend(tokens),
 		Err(e) => {
 			abort!(e.span(), e)
@@ -24,13 +31,13 @@ pub fn derive_serialize(item: TokenStream) -> TokenStream {
 	output.into()
 }
 
-#[proc_macro_derive(Deserialize, attributes(ld))]
+#[proc_macro_derive(DeserializeLinkedData, attributes(ld))]
 #[proc_macro_error]
 pub fn derive_deserialize(item: TokenStream) -> TokenStream {
 	let input = syn::parse_macro_input!(item as DeriveInput);
 	let mut output = proc_macro2::TokenStream::new();
 
-	match generate::de::subject(input) {
+	match de::derive(input) {
 		Ok(tokens) => output.extend(tokens),
 		Err(e) => {
 			abort!(e.span(), e)
