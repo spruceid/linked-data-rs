@@ -54,4 +54,5 @@ pub use de::{DeserializeLinkedData, LinkedDataDeserializer};
 pub use ser::{LinkedDataSerializer, SerializeLinkedData};
 
 /// Utility wrapper to turn lists into unordered collections.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RdfUnordered<T>(pub T);
