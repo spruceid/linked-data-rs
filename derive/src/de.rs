@@ -206,7 +206,28 @@ impl LdVariant {
 		Ok(de_props)
 	}
 
+	/// Rejects `#[ld(graph)]` fields, which `DeserializeLinkedData` does not
+	/// support yet: unlike serialization, there is no general way to
+	/// discover a field's content back from a graph it isn't linked to by
+	/// any subject/predicate.
+	fn check_no_graph_fields(&self) -> Result<(), Error> {
+		let transparent = self.is_transparent();
+
+		for f in &self.fields {
+			if matches!(
+				f.attrs.mode(f.ident.span(), transparent)?,
+				Some(FieldMode::Graph)
+			) {
+				return Err(Error::UnsupportedGraphFieldDeserialization(f.ident.span()));
+			}
+		}
+
+		Ok(())
+	}
+
 	fn deserializer(&self, prefixes: &IriPrefixes) -> Result<TokenStream, Error> {
+		self.check_no_graph_fields()?;
+
 		let subjects = self.subjects_deserializer(prefixes)?;
 		let types = self.types_deserializer(prefixes)?;
 		let props = self.props_deserializer(prefixes)?;

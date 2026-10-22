@@ -28,6 +28,11 @@ pub enum Error {
 
 	#[error("Missing `ld` attribute on field.")]
 	MissingFieldAnnotation(Span),
+
+	#[error(
+		"The `graph` field attribute is not supported by `DeserializeLinkedData` yet (only `SerializeLinkedData`)."
+	)]
+	UnsupportedGraphFieldDeserialization(Span),
 }
 
 impl Error {
@@ -42,6 +47,7 @@ impl Error {
 			Self::AmbiguousProp(s) => *s,
 			Self::AmbiguousDefault(s) => *s,
 			Self::MissingFieldAnnotation(s) => *s,
+			Self::UnsupportedGraphFieldDeserialization(s) => *s,
 		}
 	}
 }
