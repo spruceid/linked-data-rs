@@ -1,0 +1,5 @@
+<http://example.org/myGraph> <http://example.org/name> "My Graph" .
+<http://example.org/a> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Value> <http://example.org/myGraph> .
+<http://example.org/a> <http://example.org/n> "1"^^<http://www.w3.org/2001/XMLSchema#unsignedInt> <http://example.org/myGraph> .
+<http://example.org/b> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Value> <http://example.org/myGraph> .
+<http://example.org/b> <http://example.org/n> "2"^^<http://www.w3.org/2001/XMLSchema#unsignedInt> <http://example.org/myGraph> .
