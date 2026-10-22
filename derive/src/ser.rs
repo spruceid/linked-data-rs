@@ -131,15 +131,42 @@ impl LdVariant {
 		Ok(ser_props)
 	}
 
+	/// Serializes `#[ld(graph)]` fields inside the graph identified by this
+	/// struct/variant's own subject (`subjects__[0]`).
+	fn graph_fields_serializer(&self) -> Result<Vec<TokenStream>, Error> {
+		let transparent = self.is_transparent();
+		let mut ser_graphs = Vec::with_capacity(self.fields.len());
+
+		for f in &self.fields {
+			if matches!(
+				f.attrs.mode(f.ident.span(), transparent)?,
+				Some(FieldMode::Graph)
+			) {
+				let ident = &f.ident;
+
+				ser_graphs.push(quote!(
+					#ident.serialize_rdf_graph(
+						::linked_data::LinkedDataSerializer::as_dyn_mut(&mut serializer__),
+						Some(&subjects__[0])
+					)?;
+				));
+			}
+		}
+
+		Ok(ser_graphs)
+	}
+
 	fn serializer(&self, prefixes: &IriPrefixes) -> Result<TokenStream, Error> {
 		let subjects = self.subjects_serializer(prefixes)?;
 		let types = self.types_serializers(prefixes)?;
 		let props = self.props_serializer(prefixes)?;
+		let graphs = self.graph_fields_serializer()?;
 
 		Ok(quote! {
 			#subjects
 			#(#types)*
 			#(#props)*
+			#(#graphs)*
 
 			serializer__.end()
 		})

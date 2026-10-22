@@ -255,6 +255,10 @@ pub struct FieldAttributes {
 	/// Should the field be flattened?
 	pub flatten: bool,
 
+	/// Should the field be serialized/deserialized inside the graph
+	/// identified by the current struct/variant's own subject?
+	pub graph: bool,
+
 	/// Should the field be ignored?
 	///
 	/// In this case, the default value is used on deserialization.
@@ -275,6 +279,7 @@ impl FieldAttributes {
 				}
 			}
 			FieldAttribute::Flatten => self.flatten = true,
+			FieldAttribute::Graph => self.graph = true,
 			FieldAttribute::Skip => self.skip = true,
 		}
 
@@ -282,7 +287,7 @@ impl FieldAttributes {
 	}
 
 	pub fn can_be_transparent(&self) -> bool {
-		self.prop.is_none() && !self.skip
+		self.prop.is_none() && !self.skip && !self.graph
 	}
 
 	pub fn mode(&self, span: Span, transparent: bool) -> Result<Option<FieldMode<'_>>, Error> {
@@ -290,6 +295,8 @@ impl FieldAttributes {
 			Ok(None)
 		} else if transparent || self.flatten {
 			Ok(Some(FieldMode::Flatten))
+		} else if self.graph {
+			Ok(Some(FieldMode::Graph))
 		} else if let Some(prop) = &self.prop {
 			Ok(Some(FieldMode::Prop(prop)))
 		} else {
@@ -301,6 +308,7 @@ impl FieldAttributes {
 pub enum FieldMode<'a> {
 	Prop(&'a CompactIri),
 	Flatten,
+	Graph,
 }
 
 impl LdAttributes for FieldAttributes {
@@ -315,6 +323,10 @@ impl LdAttributes for FieldAttributes {
 
 		if other.flatten {
 			self.insert(FieldAttribute::Flatten)?;
+		}
+
+		if other.graph {
+			self.insert(FieldAttribute::Graph)?;
 		}
 
 		if other.skip {
@@ -341,6 +353,7 @@ pub enum FieldAttribute {
 	Prop(CompactIri),
 	Default(DefaultConstructor),
 	Flatten,
+	Graph,
 	Skip,
 }
 
@@ -365,6 +378,8 @@ impl syn::parse::Parse for FieldAttribute {
 			}))
 		} else if id == "flatten" {
 			Ok(Self::Flatten)
+		} else if id == "graph" {
+			Ok(Self::Graph)
 		} else if id == "skip" {
 			Ok(Self::Skip)
 		} else {
