@@ -4,13 +4,13 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/spruceid/linked-data-rs"
 edition = "2024"
 rust-version = "1.87.0"
-version = "0.1.2"
+version = "0.2.0"
 
 [workspace]
 members = ["derive"]
 
 [workspace.dependencies]
-linked-data-derive = { version = "0.1.0", path = "derive" } # Keep the version in sync
+linked-data-derive = { version = "0.2.0", path = "derive" } # Keep the version in sync
 rdf-syntax = "2.0"
 
 [package]
