@@ -46,7 +46,7 @@ where
 }
 
 /// Deserializes an instance of `T` from the given quads, using a custom RDF
-/// [interpretation](rdf_syntax::interpretation).
+/// [interpretation](rdf_syntax::TryInterpretationMut).
 pub fn from_rdf_quads_interpretation<I, T>(
 	quads: impl IntoIterator<Item = Quad<I::Resource>>,
 	resources: impl IntoIterator<Item = I::Resource>,
@@ -65,7 +65,7 @@ where
 }
 
 /// Deserializes an instance of `T` from the given quads, state, and using a
-/// custom RDF [interpretation](rdf_syntax::interpretation).
+/// custom RDF [interpretation](rdf_syntax::TryInterpretationMut).
 pub fn from_rdf_quads_interpretation_with<Q, I, T>(
 	quads: impl IntoIterator<Item = Quad<I::Resource>>,
 	resources: impl IntoIterator<Item = I::Resource>,
