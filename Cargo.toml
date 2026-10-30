@@ -34,7 +34,7 @@ btree-indexmap = ["dep:btree-indexmap"]
 [dependencies]
 rdf-syntax.workspace = true
 thiserror = "2.0.17"
-xsd-types = "0.10.0"
+xsd-types = "0.12"
 
 # Derive macro.
 linked-data-derive = { workspace = true, optional = true }
