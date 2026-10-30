@@ -36,3 +36,10 @@ Please read the following guidelines before submitting your changes.
 - Breaking changes must be documented.
 - Breaking changes must be justified.
 - Be respectful.
+
+## Release Process
+
+- Bump the version number in `Cargo.toml`;
+- Make a commit with the message `chore(release): Version X.Y.Z`;
+- Publish the crate;
+- On success, add a tag with `git tag -a vX.Y.Z -m "Version X.Y.Z"` and push.
